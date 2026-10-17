@@ -13,7 +13,7 @@ import {
   uid,
 } from '../domain/format'
 import { parseGpx } from '../domain/gpx'
-import type { IsoDate, Session, SessionType } from '../domain/types'
+import type { IsoDate, PaceRange, Session, SessionType } from '../domain/types'
 
 const TYPES: { key: SessionType; label: string }[] = [
   { key: 'easy', label: '轻松 E' },
@@ -45,11 +45,13 @@ export function Log({
   prefill,
   today,
   sessions,
+  paces,
   onSaved,
 }: {
   prefill?: Partial<Session> | null
   today: IsoDate
   sessions: Session[]
+  paces?: Record<'E' | 'M' | 'T' | 'I' | 'R', PaceRange>
   onSaved: () => void
 }) {
   const [date, setDate] = useState(prefill?.date ?? today)
@@ -77,19 +79,38 @@ export function Log({
   const [thresholdMode, setThresholdMode] = useState<'continuous' | 'segmented'>(
     'continuous',
   )
+  const [timeMode, setTimeMode] = useState(false)
   const useBuilder = isInterval || (isThreshold && thresholdMode === 'segmented')
 
+  const targetZone = type === 'interval' ? 'I' : type === 'repetition' ? 'R' : 'T'
+  const targetRange = paces?.[targetZone]
+  const targetPaceSecKm = targetRange
+    ? (targetRange.fastSecKm + targetRange.slowSecKm) / 2
+    : 0
+
+  const repDistanceM = (rep: RepDraft): number => {
+    if (!timeMode) return rep.distanceM
+    if (rep.distanceM > 0) return rep.distanceM
+    const seconds = parseDuration(rep.time) ?? 0
+    return targetPaceSecKm > 0 ? Math.round((seconds / targetPaceSecKm) * 1000) : 0
+  }
+
   const intervalTotals = useMemo(() => {
-    const workM = reps.reduce((sum, r) => sum + r.distanceM, 0)
+    const workM = reps.reduce((sum, rep) => {
+      if (!timeMode) return sum + rep.distanceM
+      if (rep.distanceM > 0) return sum + rep.distanceM
+      const seconds = parseDuration(rep.time) ?? 0
+      return sum + (targetPaceSecKm > 0 ? (seconds / targetPaceSecKm) * 1000 : 0)
+    }, 0)
     const workSec = reps.reduce((sum, r) => sum + (parseDuration(r.time) ?? 0), 0)
     const recoverySec = reps.reduce((sum, r) => sum + r.recoverySec, 0)
     return {
-      workM,
+      workM: Math.round(workM),
       workSec,
-      totalM: workM + 4000,
+      totalM: Math.round(workM) + 4000,
       totalSec: workSec + recoverySec + 1200,
     }
-  }, [reps])
+  }, [reps, timeMode, targetPaceSecKm])
 
   const effectiveDistanceM = useBuilder
     ? intervalTotals.totalM
@@ -156,12 +177,15 @@ export function Log({
             { kind: 'warmup' as const, distanceM: 2000, durationSec: 600 },
             ...reps.flatMap((r) => {
               const workSec = parseDuration(r.time) ?? 0
+              const distanceM = repDistanceM(r)
               return [
                 {
                   kind: 'work' as const,
-                  distanceM: r.distanceM,
+                  distanceM,
                   durationSec: workSec,
-                  label: `${formatKm(r.distanceM)} @ ${formatPace(workSec / (r.distanceM / 1000))}/km`,
+                  label: `${formatKm(distanceM)} @ ${
+                    distanceM > 0 ? formatPace(workSec / (distanceM / 1000)) : '—'
+                  }/km`,
                 },
                 {
                   kind: 'recovery' as const,
@@ -386,6 +410,32 @@ export function Log({
 
         {useBuilder ? (
           <div className="space-y-2">
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant={!timeMode ? 'primary' : 'secondary'}
+                onClick={() => setTimeMode(false)}
+                className="flex-1"
+              >
+                按距离
+              </Button>
+              <Button
+                size="sm"
+                variant={timeMode ? 'primary' : 'secondary'}
+                onClick={() => {
+                  setTimeMode(true)
+                  setReps((prev) => prev.map((rep) => ({ ...rep, distanceM: 0 })))
+                }}
+                className="flex-1"
+              >
+                按时间
+              </Button>
+            </div>
+            {timeMode ? (
+              <p className="text-[11px] text-muted">
+                距离留空时按目标配速 {targetPaceSecKm > 0 ? `${formatPace(targetPaceSecKm)}/km` : '（未获取到）'} 估算；也可以填实际距离。
+              </p>
+            ) : null}
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-slate-300">
                 {isThreshold ? '阈值分组' : '间歇结构'}
@@ -394,24 +444,54 @@ export function Log({
             </div>
             {reps.map((rep, i) => (
               <div key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-1.5">
-                <label className="block text-[10px] text-muted">
-                  距离 m
-                  <input
-                    value={rep.distanceM}
-                    onChange={(e) => updateRep(i, { distanceM: Number(e.target.value) || 0 })}
-                    inputMode="numeric"
-                    className="mt-0.5 w-full rounded-lg border border-line bg-ink/60 px-2 py-1.5 text-sm text-slate-100 outline-none focus:border-accent"
-                  />
-                </label>
-                <label className="block text-[10px] text-muted">
-                  用时
-                  <input
-                    value={rep.time}
-                    onChange={(e) => updateRep(i, { time: e.target.value })}
-                    inputMode="numeric"
-                    className="mt-0.5 w-full rounded-lg border border-line bg-ink/60 px-2 py-1.5 text-sm text-slate-100 outline-none focus:border-accent"
-                  />
-                </label>
+                {timeMode ? (
+                  <>
+                    <label className="block text-[10px] text-muted">
+                      时间
+                      <input
+                        value={rep.time}
+                        onChange={(e) => updateRep(i, { time: e.target.value })}
+                        inputMode="numeric"
+                        className="mt-0.5 w-full rounded-lg border border-line bg-ink/60 px-2 py-1.5 text-sm text-slate-100 outline-none focus:border-accent"
+                      />
+                    </label>
+                    <label className="block text-[10px] text-muted">
+                      距离 km（可选）
+                      <input
+                        value={rep.distanceM > 0 ? (rep.distanceM / 1000).toFixed(2) : ''}
+                        onChange={(e) =>
+                          updateRep(i, {
+                            distanceM: Math.round((Number(e.target.value) || 0) * 1000),
+                          })
+                        }
+                        inputMode="decimal"
+                        placeholder="自动"
+                        className="mt-0.5 w-full rounded-lg border border-line bg-ink/60 px-2 py-1.5 text-sm text-slate-100 outline-none focus:border-accent"
+                      />
+                    </label>
+                  </>
+                ) : (
+                  <>
+                    <label className="block text-[10px] text-muted">
+                      距离 m
+                      <input
+                        value={rep.distanceM}
+                        onChange={(e) => updateRep(i, { distanceM: Number(e.target.value) || 0 })}
+                        inputMode="numeric"
+                        className="mt-0.5 w-full rounded-lg border border-line bg-ink/60 px-2 py-1.5 text-sm text-slate-100 outline-none focus:border-accent"
+                      />
+                    </label>
+                    <label className="block text-[10px] text-muted">
+                      用时
+                      <input
+                        value={rep.time}
+                        onChange={(e) => updateRep(i, { time: e.target.value })}
+                        inputMode="numeric"
+                        className="mt-0.5 w-full rounded-lg border border-line bg-ink/60 px-2 py-1.5 text-sm text-slate-100 outline-none focus:border-accent"
+                      />
+                    </label>
+                  </>
+                )}
                 <label className="block text-[10px] text-muted">
                   恢复 s
                   <input

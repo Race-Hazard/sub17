@@ -233,6 +233,7 @@ export default function App() {
             prefill={logPrefill}
             today={today}
             sessions={sessions}
+            paces={status.paces}
             onSaved={() => {
               setLogPrefill(null)
               setTab('today')
