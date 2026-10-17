@@ -163,6 +163,13 @@ export interface MetaRow {
   value: string
 }
 
+/** Soft-delete marker so a deletion propagates instead of being resurrected. */
+export interface Tombstone {
+  key: string
+  kind: 'session' | 'sleep' | 'checkin'
+  at: string
+}
+
 export interface VdotResult {
   vdot: number
   equivalent5kSec: number

@@ -2,8 +2,8 @@
 
 个人使用的离线优先 5K 训练 PWA：记录训练/休息与睡眠，实时更新 VDOT、负荷与准备度，并按 26 周计划生成/调整每周课表。
 
-- 数据只存在手机浏览器（IndexedDB），无后端、无云同步。
-- 纯离线 PWA：安装后飞行模式可用。
+- 默认数据只存在本机浏览器（IndexedDB）；可选跨端同步会写到**你自己的私有 GitHub 仓库**。
+- 纯离线 PWA：安装后飞行模式可用；同步失败不影响本地使用。
 - 400 m 圈计时器、手动记录、GPX 导入、睡眠与每日签到。
 - 提醒以 `.ics` 日历为主（App 内 20:30/07:30 横幅兜底）。
 - 目标 5 km sub-17，但 App 会如实显示当前能力与目标差距。
@@ -55,6 +55,30 @@ https://<你的用户名>.github.io/sub17/
 5. 更新：完全关闭 PWA 后重新打开，新的 Service Worker 会接管；若仍是旧版，清一次站点缓存或重装。
 
 > 纯离线 PWA 无法保证 App 关闭时的定时通知；日历是唯一可靠的 App 外提醒。日历不知道你今天是否已记录，已记录时忽略即可。
+
+## 跨端同步（可选，私有 GitHub 仓库）
+
+App 仍是离线优先；云端只存一份合并后的 JSON。
+
+1. 新建一个 **Private** 仓库 `sub17-data`，勾选 **Add a README file**（让 `main` 分支存在）。
+2. 创建 **fine-grained token**：GitHub → Settings → Developer settings → Fine-grained tokens。
+   - Repository access：Only select repositories → `sub17-data`
+   - Permissions：Contents → **Read and write**；Metadata 自动只读
+   - 复制 `github_pat_...`
+3. 在手机和电脑上分别打开 App → 设置 → 云同步：
+   - Owner：`Race-Hazard`
+   - 数据仓库：`sub17-data`
+   - 文件路径：`sub17.json`
+   - 分支：`main`
+   - Token：粘贴上面的 token
+   - 保存并测试
+4. 两端填同一仓库和 token。之后打开 App、保存记录后会自动 pull+merge+push；设置页还有「立即同步」和「从云端覆盖」。
+
+说明：
+- 公开仓库会被 App 拒绝保存，避免训练数据公开。
+- token 存在本机浏览器；设备丢失时到 GitHub 立即撤销。不要用全权限 token。
+- 冲突按记录合并：训练/睡眠按 UUID/日期，同一记录以 `updatedAt` 较晚的为准；删除用 tombstone 传播。
+- 不是实时推送：另一端在下次打开/同步时看到变化。
 
 ## 数据备份
 

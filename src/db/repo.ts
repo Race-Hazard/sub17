@@ -8,8 +8,10 @@ import type {
   Profile,
   Session,
   SleepRecord,
+  Tombstone,
 } from '../domain/types'
 import { db } from './schema'
+import { markDirty } from '../sync/engine'
 
 export async function getProfile(): Promise<Profile | undefined> {
   return db.profile.get('me')
@@ -17,6 +19,7 @@ export async function getProfile(): Promise<Profile | undefined> {
 
 export async function saveProfile(profile: Profile): Promise<void> {
   await db.profile.put({ ...profile, updatedAt: nowIso() })
+  markDirty()
 }
 
 export async function listSessions(): Promise<Session[]> {
@@ -33,12 +36,22 @@ export async function sessionsForDate(date: IsoDate): Promise<Session[]> {
 
 export async function saveSession(session: Session): Promise<string> {
   const id = session.id || uid()
-  await db.sessions.put({ ...session, id, updatedAt: nowIso() })
+  await db.transaction('rw', [db.sessions, db.tombstones], async () => {
+    await db.tombstones.delete(id)
+    await db.sessions.put({ ...session, id, updatedAt: nowIso() })
+  })
+  markDirty()
   return id
 }
 
 export async function deleteSession(id: string): Promise<void> {
-  await db.sessions.delete(id)
+  const existing = await db.sessions.get(id)
+  if (!existing) return
+  await db.transaction('rw', [db.sessions, db.tombstones], async () => {
+    await db.tombstones.put({ key: id, kind: 'session', at: nowIso() })
+    await db.sessions.delete(id)
+  })
+  markDirty()
 }
 
 export async function getCheckin(date: IsoDate): Promise<Checkin | undefined> {
@@ -46,15 +59,31 @@ export async function getCheckin(date: IsoDate): Promise<Checkin | undefined> {
 }
 
 export async function saveCheckin(checkin: Checkin): Promise<void> {
-  await db.checkins.put({ ...checkin, updatedAt: nowIso() })
+  await db.transaction('rw', [db.checkins, db.tombstones], async () => {
+    await db.tombstones.delete(`checkin:${checkin.date}`)
+    await db.checkins.put({ ...checkin, updatedAt: nowIso() })
+  })
+  markDirty()
 }
 
 export async function deleteCheckin(date: IsoDate): Promise<void> {
-  await db.checkins.delete(date)
+  await db.transaction('rw', [db.checkins, db.tombstones], async () => {
+    await db.tombstones.put({
+      key: `checkin:${date}`,
+      kind: 'checkin',
+      at: nowIso(),
+    })
+    await db.checkins.delete(date)
+  })
+  markDirty()
 }
 
 export async function listCheckins(): Promise<Checkin[]> {
   return db.checkins.orderBy('date').toArray()
+}
+
+export async function listTombstones(): Promise<Tombstone[]> {
+  return db.tombstones.toArray()
 }
 
 export async function getSleep(date: IsoDate): Promise<SleepRecord | undefined> {
@@ -62,7 +91,11 @@ export async function getSleep(date: IsoDate): Promise<SleepRecord | undefined> 
 }
 
 export async function saveSleep(record: SleepRecord): Promise<void> {
-  await db.sleep.put({ ...record, updatedAt: nowIso() })
+  await db.transaction('rw', [db.sleep, db.tombstones], async () => {
+    await db.tombstones.delete(`sleep:${record.date}`)
+    await db.sleep.put({ ...record, updatedAt: nowIso() })
+  })
+  markDirty()
 }
 
 export async function listSleep(): Promise<SleepRecord[]> {
@@ -70,7 +103,15 @@ export async function listSleep(): Promise<SleepRecord[]> {
 }
 
 export async function deleteSleep(date: IsoDate): Promise<void> {
-  await db.sleep.delete(date)
+  await db.transaction('rw', [db.sleep, db.tombstones], async () => {
+    await db.tombstones.put({
+      key: `sleep:${date}`,
+      kind: 'sleep',
+      at: nowIso(),
+    })
+    await db.sleep.delete(date)
+  })
+  markDirty()
 }
 
 export async function sleepBetween(from: IsoDate, to: IsoDate): Promise<SleepRecord[]> {
@@ -91,6 +132,7 @@ export async function getPlanForWeek(weekStart: IsoDate): Promise<Plan | undefin
 
 export async function savePlan(plan: Plan): Promise<void> {
   await db.plans.put(plan)
+  markDirty()
 }
 
 export async function activatePlan(plan: Plan): Promise<void> {
@@ -101,6 +143,7 @@ export async function activatePlan(plan: Plan): Promise<void> {
     }
     await db.plans.put({ ...plan, status: 'active' })
   })
+  markDirty()
 }
 
 export async function ensurePlanForWeek(
@@ -161,19 +204,36 @@ export async function getAllMeta(): Promise<MetaRow[]> {
 
 /** Clear training data and plans, but keep profile/settings and the seed marker. */
 export async function clearTrainingData(): Promise<void> {
+  const at = nowIso()
+  const [sessions, sleeps, checkins] = await Promise.all([
+    db.sessions.toArray(),
+    db.sleep.toArray(),
+    db.checkins.toArray(),
+  ])
   await db.transaction(
     'rw',
-    [db.sessions, db.checkins, db.sleep, db.plans, db.meta],
+    [db.sessions, db.checkins, db.sleep, db.plans, db.tombstones, db.meta],
     async () => {
+      // Tombstones let an enabled cloud sync delete these records as well.
+      await db.tombstones.bulkPut([
+        ...sessions.map((s) => ({ key: s.id, kind: 'session' as const, at })),
+        ...sleeps.map((s) => ({ key: `sleep:${s.date}`, kind: 'sleep' as const, at })),
+        ...checkins.map((c) => ({
+          key: `checkin:${c.date}`,
+          kind: 'checkin' as const,
+          at,
+        })),
+      ])
       await Promise.all([
         db.sessions.clear(),
         db.checkins.clear(),
         db.sleep.clear(),
         db.plans.clear(),
       ])
-      await db.meta.put({ key: 'lastClearedAt', value: nowIso() })
+      await db.meta.put({ key: 'lastClearedAt', value: at })
     },
   )
+  markDirty()
 }
 
 export async function recentSessions(days: number, today: IsoDate): Promise<Session[]> {

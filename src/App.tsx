@@ -15,6 +15,7 @@ import { activateCurrentWeekPlan, ensurePlanForWeek } from './db/repo'
 import { addDaysIso, todayIso, mondayOf, weekdayIndex } from './domain/format'
 import { getWeekIndex, weeklyTargetKm } from './domain/plan'
 import { adjustNextWeek, latestCheckpointVerdict } from './domain/coach'
+import { initSync, setupSyncListeners } from './sync/engine'
 import { bestCurrentVdot } from './domain/projection'
 import { computeStatus } from './domain/status'
 import type { Checkin, Plan, Profile, Session, SleepRecord } from './domain/types'
@@ -87,6 +88,14 @@ export default function App() {
 
   const onboarded = localOnboarded || onboardedMeta?.value === '1'
   const activePlan = plans.find((p) => p.status === 'active') ?? null
+
+  useEffect(() => {
+    setupSyncListeners()
+  }, [])
+
+  useEffect(() => {
+    if (seeded && onboarded) void initSync()
+  }, [seeded, onboarded])
 
   useEffect(() => {
     if (!seeded || !profile || !onboarded) return

@@ -1,6 +1,15 @@
 import { formatPace, nowIso, secondsPerKm, todayIso } from '../domain/format'
-import type { Checkin, MetaRow, Plan, Profile, Session, SleepRecord } from '../domain/types'
+import type {
+  Checkin,
+  MetaRow,
+  Plan,
+  Profile,
+  Session,
+  SleepRecord,
+  Tombstone,
+} from '../domain/types'
 import { db, SCHEMA_VERSION } from './schema'
+import { markDirty } from '../sync/engine'
 
 export const APP_VERSION = '0.1.0'
 
@@ -16,17 +25,20 @@ export interface BackupPayload {
   sleep: SleepRecord[]
   plans: Plan[]
   meta: MetaRow[]
+  tombstones: Tombstone[]
 }
 
 export async function exportBackup(): Promise<BackupPayload> {
-  const [profile, sessions, checkins, sleep, plans, meta] = await Promise.all([
-    db.profile.toArray(),
-    db.sessions.toArray(),
-    db.checkins.toArray(),
-    db.sleep.toArray(),
-    db.plans.toArray(),
-    db.meta.toArray(),
-  ])
+  const [profile, sessions, checkins, sleep, plans, meta, tombstones] =
+    await Promise.all([
+      db.profile.toArray(),
+      db.sessions.toArray(),
+      db.checkins.toArray(),
+      db.sleep.toArray(),
+      db.plans.toArray(),
+      db.meta.toArray(),
+      db.tombstones.toArray(),
+    ])
   return {
     app: 'sub17',
     schemaVersion: SCHEMA_VERSION,
@@ -39,6 +51,7 @@ export async function exportBackup(): Promise<BackupPayload> {
       sleep: sleep.length,
       plans: plans.length,
       meta: meta.length,
+      tombstones: tombstones.length,
     },
     profile,
     sessions,
@@ -46,6 +59,7 @@ export async function exportBackup(): Promise<BackupPayload> {
     sleep,
     plans,
     meta,
+    tombstones,
   }
 }
 
@@ -61,14 +75,20 @@ export function validateBackup(value: unknown): { ok: true; payload: BackupPaylo
   for (const key of arrays) {
     if (!Array.isArray(v[key])) return { ok: false, error: `备份缺少 ${String(key)}` }
   }
-  return { ok: true, payload: v as BackupPayload }
+  if (v.tombstones != null && !Array.isArray(v.tombstones)) {
+    return { ok: false, error: '备份里的 tombstones 不是数组' }
+  }
+  return {
+    ok: true,
+    payload: { ...(v as BackupPayload), tombstones: v.tombstones ?? [] },
+  }
 }
 
 /** v1 import semantics: full replace. */
 export async function importBackup(payload: BackupPayload): Promise<void> {
   await db.transaction(
     'rw',
-    [db.sessions, db.checkins, db.sleep, db.plans, db.profile, db.meta],
+    [db.sessions, db.checkins, db.sleep, db.plans, db.profile, db.meta, db.tombstones],
     async () => {
       await Promise.all([
         db.sessions.clear(),
@@ -77,6 +97,7 @@ export async function importBackup(payload: BackupPayload): Promise<void> {
         db.plans.clear(),
         db.profile.clear(),
         db.meta.clear(),
+        db.tombstones.clear(),
       ])
       await db.profile.bulkPut(payload.profile)
       await db.sessions.bulkPut(payload.sessions)
@@ -84,9 +105,11 @@ export async function importBackup(payload: BackupPayload): Promise<void> {
       await db.sleep.bulkPut(payload.sleep)
       await db.plans.bulkPut(payload.plans)
       await db.meta.bulkPut(payload.meta)
+      await db.tombstones.bulkPut(payload.tombstones ?? [])
     },
   )
   await db.meta.put({ key: 'lastBackupAt', value: nowIso() })
+  markDirty()
 }
 
 export function backupFilename(date = todayIso()): string {

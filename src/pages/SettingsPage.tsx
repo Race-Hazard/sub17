@@ -18,7 +18,17 @@ import {
   sleepCsv,
   validateBackup,
 } from '../db/backup'
-import { clearTrainingData, saveProfile } from '../db/repo'
+import { clearTrainingData, getMeta, saveProfile } from '../db/repo'
+import {
+  clearSyncConfig,
+  DEFAULT_SYNC_CONFIG,
+  loadSyncConfig,
+  maskToken,
+  saveSyncConfig,
+  testConnection,
+  type SyncConfig,
+} from '../sync/github'
+import { pullAndReplace, syncNow } from '../sync/engine'
 import { buildReminderIcs, downloadIcs } from '../domain/notify'
 import { formatDuration, parseDuration } from '../domain/format'
 import type { Profile, Session, SleepRecord } from '../domain/types'
@@ -44,6 +54,19 @@ export function SettingsPage({
   const [storage, setStorage] = useState<{ usage?: number; quota?: number; persisted?: boolean }>({})
   const fileRef = useRef<HTMLInputElement>(null)
 
+  const [sync, setSync] = useState<SyncConfig | null>(() => loadSyncConfig())
+  const [syncEditing, setSyncEditing] = useState(() => loadSyncConfig() == null)
+  const [syncOwner, setSyncOwner] = useState(sync?.owner ?? DEFAULT_SYNC_CONFIG.owner)
+  const [syncRepo, setSyncRepo] = useState(sync?.repo ?? DEFAULT_SYNC_CONFIG.repo)
+  const [syncPath, setSyncPath] = useState(sync?.path ?? DEFAULT_SYNC_CONFIG.path)
+  const [syncBranch, setSyncBranch] = useState(sync?.branch ?? DEFAULT_SYNC_CONFIG.branch)
+  const [syncToken, setSyncToken] = useState('')
+  const [syncAuto, setSyncAuto] = useState(sync?.auto ?? true)
+  const [syncBusy, setSyncBusy] = useState(false)
+  const [syncMsg, setSyncMsg] = useState<string | null>(null)
+  const [lastSync, setLastSync] = useState<string | null>(null)
+  const [lastSyncError, setLastSyncError] = useState<string | null>(null)
+
   useEffect(() => {
     void (async () => {
       try {
@@ -55,6 +78,13 @@ export function SettingsPage({
       }
     })()
   }, [])
+
+  useEffect(() => {
+    void (async () => {
+      setLastSync((await getMeta('lastSyncAt')) ?? null)
+      setLastSyncError((await getMeta('lastSyncError')) ?? null)
+    })()
+  }, [sync, syncMsg])
 
   const save = async () => {
     const goalSec = parseDuration(goalText) ?? profile.goalTimeSec
@@ -105,7 +135,16 @@ export function SettingsPage({
   }
 
   const clear = async () => {
-    if (!window.confirm('清空全部训练、睡眠与计划？此操作不可撤销，建议先导出备份。')) return
+    const cloudNote = sync
+      ? '云同步已开启：这次清空也会同步删除云端训练记录。'
+      : ''
+    if (
+      !window.confirm(
+        `清空全部训练、睡眠与计划？此操作不可撤销，建议先导出备份。${cloudNote}`,
+      )
+    ) {
+      return
+    }
     if (!window.confirm('再确认一次：训练、睡眠与计划会删除，个人资料与设置保留。')) return
     await clearTrainingData()
     window.location.reload()
@@ -119,6 +158,66 @@ export function SettingsPage({
     } catch {
       setMessage('当前浏览器不支持持久化申请')
     }
+  }
+
+  const saveSync = async () => {
+    const token = syncToken.trim() || sync?.token || ''
+    const config: SyncConfig = {
+      owner: syncOwner.trim(),
+      repo: syncRepo.trim(),
+      path: syncPath.trim() || 'sub17.json',
+      branch: syncBranch.trim() || 'main',
+      token,
+      auto: syncAuto,
+    }
+    if (!config.owner || !config.repo || !config.token) {
+      setSyncMsg('请填写 owner、repo 和 token')
+      return
+    }
+    setSyncBusy(true)
+    const test = await testConnection(config)
+    if (!test.ok) {
+      setSyncMsg(test.message)
+      setSyncBusy(false)
+      return
+    }
+    if (test.isPrivate === false) {
+      setSyncMsg('这是公开仓库，训练数据会公开可读；请把仓库改成 Private 后再保存')
+      setSyncBusy(false)
+      return
+    }
+    saveSyncConfig(config)
+    setSync(config)
+    setSyncToken('')
+    setSyncEditing(false)
+    const result = await syncNow(config)
+    setSyncMsg(`${test.message}；${result.message}`)
+    setSyncBusy(false)
+  }
+
+  const runSync = async () => {
+    if (!sync) return
+    setSyncBusy(true)
+    const result = await syncNow(sync)
+    setSyncMsg(result.message)
+    setSyncBusy(false)
+  }
+
+  const overwriteFromCloud = async () => {
+    if (!sync) return
+    if (!window.confirm('用云端数据覆盖本机？本机未同步的修改会丢失。')) return
+    setSyncBusy(true)
+    const result = await pullAndReplace()
+    setSyncMsg(result.message)
+    setSyncBusy(false)
+  }
+
+  const disconnectSync = () => {
+    if (!window.confirm('断开云同步？本机数据会保留，但不再自动同步。')) return
+    clearSyncConfig()
+    setSync(null)
+    setSyncEditing(true)
+    setSyncMsg('已断开云同步')
   }
 
   const usageMb = storage.usage != null ? (storage.usage / 1024 / 1024).toFixed(1) : null
@@ -199,6 +298,129 @@ export function SettingsPage({
         <Button className="w-full" onClick={save}>保存设置</Button>
       </Card>
 
+      <SectionTitle>云同步（可选）</SectionTitle>
+      <Card className="space-y-3">
+        {!syncEditing && sync ? (
+          <>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium text-slate-200">
+                  {sync.owner}/{sync.repo}
+                </div>
+                <div className="text-[11px] text-muted">
+                  {sync.path} · {sync.branch} · token {maskToken(sync.token)}
+                </div>
+              </div>
+              <Pill tone={sync.auto ? 'good' : 'neutral'}>
+                {sync.auto ? '自动同步' : '手动同步'}
+              </Pill>
+            </div>
+            <div className="text-[11px] text-muted">
+              上次同步：
+              {lastSync ? new Date(lastSync).toLocaleString('zh-CN') : '—'}
+            </div>
+            {lastSyncError ? (
+              <div className="rounded-lg border border-bad/25 bg-bad/10 px-2.5 py-1.5 text-[11px] text-bad">
+                上次错误：{lastSyncError}
+              </div>
+            ) : null}
+            <div className="flex flex-wrap gap-1.5">
+              <Button size="sm" onClick={() => void runSync()} disabled={syncBusy}>
+                {syncBusy ? '同步中…' : '立即同步'}
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => void overwriteFromCloud()} disabled={syncBusy}>
+                从云端覆盖
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => setSyncEditing(true)}>
+                编辑
+              </Button>
+              <Button size="sm" variant="danger" onClick={disconnectSync}>
+                断开
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-[11px] leading-relaxed text-muted">
+              新建一个 <span className="text-slate-300">Private</span> 仓库（建议 `sub17-data`，不要用公开的代码仓库）。
+              创建 fine-grained token，只授权该仓库的 <span className="text-slate-300">Contents: Read and write</span>。
+              手机和电脑填同一个仓库与 token。
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block text-xs text-muted">
+                Owner
+                <input
+                  value={syncOwner}
+                  onChange={(e) => setSyncOwner(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-line bg-ink/60 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-accent"
+                />
+              </label>
+              <label className="block text-xs text-muted">
+                数据仓库
+                <input
+                  value={syncRepo}
+                  onChange={(e) => setSyncRepo(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-line bg-ink/60 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-accent"
+                />
+              </label>
+              <label className="block text-xs text-muted">
+                文件路径
+                <input
+                  value={syncPath}
+                  onChange={(e) => setSyncPath(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-line bg-ink/60 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-accent"
+                />
+              </label>
+              <label className="block text-xs text-muted">
+                分支
+                <input
+                  value={syncBranch}
+                  onChange={(e) => setSyncBranch(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-line bg-ink/60 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-accent"
+                />
+              </label>
+            </div>
+            <label className="block text-xs text-muted">
+              Token（只存本机）
+              <input
+                type="password"
+                value={syncToken}
+                onChange={(e) => setSyncToken(e.target.value)}
+                placeholder={sync ? '留空则沿用已保存的 token' : 'github_pat_…'}
+                className="mt-1 w-full rounded-xl border border-line bg-ink/60 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-accent"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-xs text-muted">
+              <input
+                type="checkbox"
+                checked={syncAuto}
+                onChange={(e) => setSyncAuto(e.target.checked)}
+                className="accent-[color:var(--color-accent)]"
+              />
+              打开 App、保存后自动同步
+            </label>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => void saveSync()} disabled={syncBusy}>
+                {syncBusy ? '检查中…' : '保存并测试'}
+              </Button>
+              {sync ? (
+                <Button size="sm" variant="secondary" onClick={() => setSyncEditing(false)}>
+                  取消
+                </Button>
+              ) : null}
+            </div>
+          </>
+        )}
+        {syncMsg ? (
+          <div className="rounded-lg border border-accent-2/25 bg-accent-2/10 px-2.5 py-1.5 text-[11px] text-accent-2">
+            {syncMsg}
+          </div>
+        ) : null}
+        <p className="text-[10px] leading-relaxed text-muted">
+          token 存在本机浏览器里；拿到你解锁设备的人可能读取它。请用只授权 `sub17-data` 的 fine-grained token，丢失设备时立即到 GitHub 撤销。
+        </p>
+      </Card>
+
       <SectionTitle>备份与数据</SectionTitle>
       <Card className="space-y-2">
         <div className="flex items-center justify-between">
@@ -256,7 +478,9 @@ export function SettingsPage({
         <div className="flex items-center justify-between border-t border-line/70 pt-2">
           <div>
             <div className="text-sm font-medium text-bad">清空训练与计划</div>
-            <div className="text-[11px] text-muted">保留个人资料与设置；先导出备份</div>
+            <div className="text-[11px] text-muted">
+              {sync ? '云同步已开启：会同步删除云端训练记录' : '保留个人资料与设置；先导出备份'}
+            </div>
           </div>
           <Button size="sm" variant="danger" onClick={clear}>
             <RotateCcw size={14} /> 清空
