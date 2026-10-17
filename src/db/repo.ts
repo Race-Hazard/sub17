@@ -1,0 +1,181 @@
+import { addDaysIso, mondayOf, nowIso, uid } from '../domain/format'
+import { generatePlanWeek } from '../domain/plan'
+import type {
+  Checkin,
+  IsoDate,
+  MetaRow,
+  Plan,
+  Profile,
+  Session,
+  SleepRecord,
+} from '../domain/types'
+import { db } from './schema'
+
+export async function getProfile(): Promise<Profile | undefined> {
+  return db.profile.get('me')
+}
+
+export async function saveProfile(profile: Profile): Promise<void> {
+  await db.profile.put({ ...profile, updatedAt: nowIso() })
+}
+
+export async function listSessions(): Promise<Session[]> {
+  return db.sessions.orderBy('date').toArray()
+}
+
+export async function sessionsBetween(from: IsoDate, to: IsoDate): Promise<Session[]> {
+  return db.sessions.where('date').between(from, to, true, true).toArray()
+}
+
+export async function sessionsForDate(date: IsoDate): Promise<Session[]> {
+  return db.sessions.where('date').equals(date).toArray()
+}
+
+export async function saveSession(session: Session): Promise<string> {
+  const id = session.id || uid()
+  await db.sessions.put({ ...session, id, updatedAt: nowIso() })
+  return id
+}
+
+export async function deleteSession(id: string): Promise<void> {
+  await db.sessions.delete(id)
+}
+
+export async function getCheckin(date: IsoDate): Promise<Checkin | undefined> {
+  return db.checkins.get(date)
+}
+
+export async function saveCheckin(checkin: Checkin): Promise<void> {
+  await db.checkins.put({ ...checkin, updatedAt: nowIso() })
+}
+
+export async function deleteCheckin(date: IsoDate): Promise<void> {
+  await db.checkins.delete(date)
+}
+
+export async function listCheckins(): Promise<Checkin[]> {
+  return db.checkins.orderBy('date').toArray()
+}
+
+export async function getSleep(date: IsoDate): Promise<SleepRecord | undefined> {
+  return db.sleep.get(date)
+}
+
+export async function saveSleep(record: SleepRecord): Promise<void> {
+  await db.sleep.put({ ...record, updatedAt: nowIso() })
+}
+
+export async function listSleep(): Promise<SleepRecord[]> {
+  return db.sleep.orderBy('date').toArray()
+}
+
+export async function deleteSleep(date: IsoDate): Promise<void> {
+  await db.sleep.delete(date)
+}
+
+export async function sleepBetween(from: IsoDate, to: IsoDate): Promise<SleepRecord[]> {
+  return db.sleep.where('date').between(from, to, true, true).toArray()
+}
+
+export async function listPlans(): Promise<Plan[]> {
+  return db.plans.orderBy('weekStart').toArray()
+}
+
+export async function getActivePlan(): Promise<Plan | undefined> {
+  return db.plans.where('status').equals('active').first()
+}
+
+export async function getPlanForWeek(weekStart: IsoDate): Promise<Plan | undefined> {
+  return db.plans.where('weekStart').equals(weekStart).first()
+}
+
+export async function savePlan(plan: Plan): Promise<void> {
+  await db.plans.put(plan)
+}
+
+export async function activatePlan(plan: Plan): Promise<void> {
+  await db.transaction('rw', db.plans, async () => {
+    const active = await db.plans.where('status').equals('active').toArray()
+    for (const p of active) {
+      if (p.id !== plan.id) await db.plans.put({ ...p, status: 'superseded' })
+    }
+    await db.plans.put({ ...plan, status: 'active' })
+  })
+}
+
+export async function ensurePlanForWeek(
+  weekIndex: number,
+  weekStart: IsoDate,
+  vdot: number,
+  profile: Profile,
+  rationale?: string,
+  activate = false,
+): Promise<Plan> {
+  const existing = await getPlanForWeek(weekStart)
+  if (existing) {
+    if (activate) await activatePlan(existing)
+    return existing
+  }
+  const plan = generatePlanWeek({ weekIndex, weekStart, vdot, profile, rationale })
+  try {
+    if (activate) {
+      await activatePlan(plan)
+    } else {
+      // Future weeks stay in the archive until their Monday arrives.
+      await savePlan({ ...plan, status: 'superseded' })
+    }
+    return plan
+  } catch (error) {
+    // Another tab may have created the same unique weekStart first.
+    const raced = await getPlanForWeek(weekStart)
+    if (raced) {
+      if (activate) await activatePlan(raced)
+      return raced
+    }
+    throw error
+  }
+}
+
+/** Call on app start: make the plan for the current Monday active. */
+export async function activateCurrentWeekPlan(today: IsoDate): Promise<Plan | undefined> {
+  const weekStart = mondayOf(today)
+  const plan = await getPlanForWeek(weekStart)
+  if (plan) {
+    await activatePlan(plan)
+    return plan
+  }
+  return undefined
+}
+
+export async function getMeta(key: string): Promise<string | undefined> {
+  return (await db.meta.get(key))?.value
+}
+
+export async function setMeta(key: string, value: string): Promise<void> {
+  await db.meta.put({ key, value })
+}
+
+export async function getAllMeta(): Promise<MetaRow[]> {
+  return db.meta.toArray()
+}
+
+/** Clear training data and plans, but keep profile/settings and the seed marker. */
+export async function clearTrainingData(): Promise<void> {
+  await db.transaction(
+    'rw',
+    [db.sessions, db.checkins, db.sleep, db.plans, db.meta],
+    async () => {
+      await Promise.all([
+        db.sessions.clear(),
+        db.checkins.clear(),
+        db.sleep.clear(),
+        db.plans.clear(),
+      ])
+      await db.meta.put({ key: 'lastClearedAt', value: nowIso() })
+    },
+  )
+}
+
+export async function recentSessions(days: number, today: IsoDate): Promise<Session[]> {
+  return sessionsBetween(addDaysIso(today, -(days - 1)), today)
+}
