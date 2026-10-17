@@ -16,11 +16,11 @@ import { parseGpx } from '../domain/gpx'
 import type { IsoDate, Session, SessionType } from '../domain/types'
 
 const TYPES: { key: SessionType; label: string }[] = [
-  { key: 'easy', label: '轻松跑' },
+  { key: 'easy', label: '轻松 E' },
   { key: 'long', label: '长距离' },
-  { key: 'interval', label: '间歇' },
-  { key: 'threshold', label: '阈值' },
-  { key: 'repetition', label: '重复' },
+  { key: 'interval', label: '间歇 I' },
+  { key: 'threshold', label: '阈值 T' },
+  { key: 'repetition', label: '重复 R' },
   { key: 'time_trial', label: '计时赛' },
   { key: 'strength', label: '力量' },
   { key: 'rest', label: '休息' },
@@ -70,9 +70,14 @@ export function Log({
   const gpxRef = useRef<HTMLInputElement>(null)
 
   const isInterval = type === 'interval' || type === 'repetition'
+  const isThreshold = type === 'threshold'
   const isStrength = type === 'strength'
   const isRest = type === 'rest'
   const isTest = type === 'time_trial'
+  const [thresholdMode, setThresholdMode] = useState<'continuous' | 'segmented'>(
+    'continuous',
+  )
+  const useBuilder = isInterval || (isThreshold && thresholdMode === 'segmented')
 
   const intervalTotals = useMemo(() => {
     const workM = reps.reduce((sum, r) => sum + r.distanceM, 0)
@@ -86,12 +91,12 @@ export function Log({
     }
   }, [reps])
 
-  const effectiveDistanceM = isInterval
+  const effectiveDistanceM = useBuilder
     ? intervalTotals.totalM
     : isRest || isStrength
       ? 0
       : Math.round((Number(distanceKm) || 0) * 1000)
-  const effectiveDurationSec = isInterval
+  const effectiveDurationSec = useBuilder
     ? intervalTotals.totalSec
     : isRest
       ? 0
@@ -113,8 +118,16 @@ export function Log({
     setDurationText(session.durationSec ? formatDuration(session.durationSec) : '')
     setRpe(session.rpe ?? 4)
     setNotes(session.notes ?? '')
-    if (session.type === 'interval' || session.type === 'repetition') {
-      const segments = session.segments ?? []
+    const segments = session.segments ?? []
+    const hasWorkSegments = segments.some((seg) => seg.kind === 'work')
+    if (session.type === 'threshold' && hasWorkSegments) {
+      setThresholdMode('segmented')
+    }
+    if (
+      session.type === 'interval' ||
+      session.type === 'repetition' ||
+      (session.type === 'threshold' && hasWorkSegments)
+    ) {
       const work = segments
         .map((seg, idx) => ({ seg, idx }))
         .filter(({ seg }) => seg.kind === 'work')
@@ -138,7 +151,7 @@ export function Log({
   const save = async () => {
     setSaving(true)
     const segments =
-      isInterval
+      useBuilder
         ? [
             { kind: 'warmup' as const, distanceM: 2000, durationSec: 600 },
             ...reps.flatMap((r) => {
@@ -172,7 +185,7 @@ export function Log({
       plannedSessionId: editingSession?.plannedSessionId ?? prefill?.plannedSessionId,
       isTest: isTest && effectiveDistanceM >= 1500,
       testDistanceM: isTest && effectiveDistanceM >= 1500 ? effectiveDistanceM : undefined,
-      segments: isInterval ? segments : (editingSession?.segments ?? prefill?.segments),
+      segments: useBuilder ? segments : (editingSession?.segments ?? prefill?.segments),
       strengthSets: isStrength ? editingSession?.strengthSets : undefined,
       createdAt: editingSession?.createdAt ?? prefill?.createdAt ?? nowIso(),
       updatedAt: nowIso(),
@@ -277,6 +290,52 @@ export function Log({
           ))}
         </div>
 
+        {type === 'interval' ? (
+          <p className="rounded-lg border border-line/60 bg-ink/40 px-2.5 py-1.5 text-[11px] leading-relaxed text-muted">
+            间歇 I：800–1200 m，组间慢跑 2–3 min；练最大摄氧量，配速看状态页 I 区间（当前约 3:54–4:00/km）。
+          </p>
+        ) : null}
+        {type === 'repetition' ? (
+          <p className="rounded-lg border border-line/60 bg-ink/40 px-2.5 py-1.5 text-[11px] leading-relaxed text-muted">
+            重复 R：200–400 m，充分恢复；练速度与跑姿，配速看状态页 R 区间（当前约 3:36–3:45/km），不堆疲劳。
+          </p>
+        ) : null}
+        {type === 'threshold' ? (
+          <p className="rounded-lg border border-line/60 bg-ink/40 px-2.5 py-1.5 text-[11px] leading-relaxed text-muted">
+            阈值 T：1–3 km 或 8–15 min，组间 60–90 s；练乳酸阈，配速看状态页 T 区间（当前约 4:15–4:19/km）。
+          </p>
+        ) : null}
+
+        {isThreshold ? (
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant={thresholdMode === 'continuous' ? 'primary' : 'secondary'}
+              onClick={() => setThresholdMode('continuous')}
+              className="flex-1"
+            >
+              连续跑
+            </Button>
+            <Button
+              size="sm"
+              variant={thresholdMode === 'segmented' ? 'primary' : 'secondary'}
+              onClick={() => {
+                setThresholdMode('segmented')
+                setReps(
+                  Array.from({ length: 3 }, () => ({
+                    distanceM: 2000,
+                    time: '8:30',
+                    recoverySec: 90,
+                  })),
+                )
+              }}
+              className="flex-1"
+            >
+              分组跑（2 组以上）
+            </Button>
+          </div>
+        ) : null}
+
         <label className="block text-xs text-muted">
           日期
           <input
@@ -287,7 +346,7 @@ export function Log({
           />
         </label>
 
-        {!isRest && !isStrength && !isInterval ? (
+        {!isRest && !isStrength && !useBuilder ? (
           <div className="grid grid-cols-2 gap-2">
             <label className="block text-xs text-muted">
               距离（km）
@@ -325,10 +384,12 @@ export function Log({
           </label>
         ) : null}
 
-        {isInterval ? (
+        {useBuilder ? (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-300">间歇结构</span>
+              <span className="text-xs font-medium text-slate-300">
+                {isThreshold ? '阈值分组' : '间歇结构'}
+              </span>
               <span className="text-[11px] text-muted">总 {formatKm(intervalTotals.totalM)} · {formatDuration(intervalTotals.totalSec)}</span>
             </div>
             {reps.map((rep, i) => (
