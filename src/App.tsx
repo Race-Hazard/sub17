@@ -253,6 +253,7 @@ export default function App() {
     checkins,
     profile,
     activePlan,
+    plans,
     today,
   })
   const plannedToday = activePlan?.plannedSessions.find((s) => s.date === today) ?? null

@@ -3,6 +3,7 @@ import { addDaysIso, daysBetween, mondayOf, secondsPerKm, weekdayIndex } from '.
 import { rpeDrift, summarizeLoad, totalKm, weeklyKm } from './load'
 import { goalConfidence, bestCurrentVdot, MILESTONES, type GoalConfidence } from './projection'
 import { evaluateReadiness } from './readiness'
+import { qualitySummary, type QualitySummary } from './quality'
 import { sleepSummary } from './sleep'
 import type {
   Checkin,
@@ -44,6 +45,7 @@ export interface TrainingStatus {
   phase: number
   weeksRemaining: number
   goal: GoalConfidence
+  quality: QualitySummary
   compliance: ComplianceResult | null
   nextMilestone: (typeof MILESTONES)[number] | null
   tests: { date: IsoDate; distanceM: number; timeSec: number; vdot: number }[]
@@ -55,11 +57,13 @@ export interface StatusInput {
   checkins: Checkin[]
   profile: Profile
   activePlan: Plan | null
+  plans?: Plan[]
   today: IsoDate
 }
 
 export function computeStatus(input: StatusInput): TrainingStatus {
   const { sessions, sleeps, checkins, profile, activePlan, today } = input
+  const plans = input.plans ?? (activePlan ? [activePlan] : [])
 
   const tests = sessions
     .filter((s) => s.isTest && (s.testDistanceM ?? s.distanceM ?? 0) >= 1500)
@@ -113,6 +117,7 @@ export function computeStatus(input: StatusInput): TrainingStatus {
   const paces = trainingPaces(currentVdot)
   paces.E = practicalEasyPace(currentVdot)
   const goalVdot = vdotForGoal(5000, profile.goalTimeSec)
+  const quality = qualitySummary(sessions, plans, currentVdot)
 
   return {
     currentVdot,
@@ -131,6 +136,7 @@ export function computeStatus(input: StatusInput): TrainingStatus {
     phase: phaseForWeek(currentWeekIndex || 1),
     weeksRemaining: Math.round(weeksRemaining * 10) / 10,
     goal: goalConfidence(currentVdot, weeksRemaining, goalVdot),
+    quality,
     compliance: activePlan
       ? complianceForPlan(activePlan, sessions, checkins, profile.createdDate)
       : null,

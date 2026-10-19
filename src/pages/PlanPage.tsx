@@ -156,6 +156,15 @@ export function PlanPage({
         </Card>
       ) : null}
 
+      {status.quality.last ? (
+        <Card className="space-y-1.5">
+          <div className="text-xs font-semibold text-slate-200">下次同类质量课建议</div>
+          <div className="text-[11px] leading-relaxed text-slate-300">
+            {status.quality.last.nextAdvice}
+          </div>
+        </Card>
+      ) : null}
+
       <SectionTitle>本周课表</SectionTitle>
       <div className="space-y-2">
         {activePlan.plannedSessions.map((planned) => {

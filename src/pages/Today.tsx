@@ -22,6 +22,7 @@ import {
   secondsPerKm,
   uid,
 } from '../domain/format'
+import { qualityKindLabel } from '../domain/quality'
 import type { TrainingStatus } from '../domain/status'
 import type {
   Checkin,
@@ -214,6 +215,38 @@ export function Today({
           <Button variant="secondary" size="sm" onClick={onPlan}>查看计划</Button>
         </Card>
       )}
+
+      {status.quality.last && status.quality.last.date === today ? (
+        <Card className="space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <div className="text-sm font-semibold text-slate-200">
+                本次质量课评估 · {qualityKindLabel(status.quality.last.kind)}
+              </div>
+              <div className="mt-0.5 text-[11px] text-muted">
+                {status.quality.last.summary}
+              </div>
+            </div>
+            <Pill
+              tone={
+                status.quality.last.verdict === 'excellent' ||
+                status.quality.last.verdict === 'onTarget'
+                  ? 'good'
+                  : status.quality.last.verdict === 'fade'
+                    ? 'warn'
+                    : status.quality.last.verdict === 'fast'
+                      ? 'sky'
+                      : 'bad'
+              }
+            >
+              {status.quality.last.verdictLabel}
+            </Pill>
+          </div>
+          <div className="rounded-lg border border-accent-2/20 bg-accent-2/5 px-2.5 py-2 text-xs leading-relaxed text-slate-300">
+            下次同类课建议：{status.quality.last.nextAdvice}
+          </div>
+        </Card>
+      ) : null}
 
       <SectionTitle>快速记录</SectionTitle>
       <div className="grid grid-cols-2 gap-2">
