@@ -14,9 +14,11 @@ import type {
   PaceRange,
   Plan,
   PlannedSession,
+  PlannedWorkout,
   Profile,
   TrainingZone,
 } from './types'
+import type { NextQualityWorkout, QualityKind } from './quality'
 import { equivalentPaceSecKm, practicalEasyPace, trainingPaces, zonePace } from './vdot'
 
 type Phase = 1 | 2 | 3 | 4 | 5
@@ -234,6 +236,83 @@ function workoutDetails(
   }
 }
 
+function workoutOf(bp: WorkoutBlueprint): PlannedWorkout {
+  if (bp.kind === 'interval') {
+    return {
+      mode: 'interval',
+      zone: bp.zone ?? 'I',
+      reps: bp.reps,
+      repDistanceM: bp.repDistanceM,
+      recoverySec: bp.recoverySec,
+    }
+  }
+  if (bp.kind === 'continuous') {
+    return {
+      mode: 'continuous',
+      zone: bp.zone ?? 'T',
+      continuousMin: bp.continuousMin,
+    }
+  }
+  if (bp.kind === 'test') {
+    return {
+      mode: 'interval',
+      zone: '5K',
+      reps: 1,
+      repDistanceM: bp.testDistanceM,
+    }
+  }
+  return { mode: 'continuous', zone: 'E' }
+}
+
+function workoutWithAdvice(
+  bp: WorkoutBlueprint,
+  advice: Partial<Record<QualityKind, NextQualityWorkout>> | undefined,
+): PlannedWorkout {
+  const workout = workoutOf(bp)
+  const kind = kindOfBlueprint(bp)
+  const next = kind ? advice?.[kind] : undefined
+  if (next?.sourceSessionId && next.mode === workout.mode) {
+    workout.adviceFromSessionId = next.sourceSessionId
+  }
+  return workout
+}
+
+function kindOfBlueprint(bp: WorkoutBlueprint): QualityKind | null {
+  if (bp.kind === 'test') return 'TEST'
+  if (bp.zone === 'I') return 'I'
+  if (bp.zone === 'T') return 'T'
+  if (bp.zone === 'R') return 'R'
+  if (bp.zone === '5K') return '5K'
+  return null
+}
+
+function applyAdviceToBlueprint(
+  bp: WorkoutBlueprint,
+  advice: Partial<Record<QualityKind, NextQualityWorkout>> | undefined,
+  allow: boolean,
+): WorkoutBlueprint {
+  if (!allow) return bp
+  const kind = kindOfBlueprint(bp)
+  if (!kind) return bp
+  const next = advice?.[kind]
+  if (!next) return bp
+  if (next.mode === 'interval' && bp.kind === 'interval') {
+    const reps = Math.max(
+      2,
+      Math.min(16, (bp.reps ?? 4) + (next.repsDelta ?? 0)),
+    )
+    return { ...bp, reps }
+  }
+  if (next.mode === 'continuous' && bp.kind === 'continuous') {
+    const continuousMin = Math.max(
+      20,
+      Math.min(40, (bp.continuousMin ?? 25) + (next.continuousMinDelta ?? 0)),
+    )
+    return { ...bp, continuousMin }
+  }
+  return bp
+}
+
 interface EasyAllocation {
   mediumLong: number
   easy: number
@@ -303,6 +382,7 @@ export interface GenerateWeekOptions {
   phaseOverride?: number
   rationale?: string
   version?: number
+  qualityAdvice?: Partial<Record<QualityKind, NextQualityWorkout>>
 }
 
 /**
@@ -314,6 +394,15 @@ export function generatePlanWeek(opts: GenerateWeekOptions): Plan {
   const bp = WEEK_BLUEPRINTS.find((w) => w.week === weekIndex) ?? WEEK_BLUEPRINTS[25]
   const phase = (opts.phaseOverride as Phase | undefined) ?? bp.phase
   const targetKm = opts.targetKmOverride ?? bp.targetKm
+  const allowAdvice = phase < 5 && !bp.raceWeek
+  const q1Kind = kindOfBlueprint(bp.q1)
+  const q2Kind = kindOfBlueprint(bp.q2)
+  const q1Bp = applyAdviceToBlueprint(bp.q1, opts.qualityAdvice, allowAdvice)
+  const q2Bp = applyAdviceToBlueprint(
+    bp.q2,
+    opts.qualityAdvice,
+    allowAdvice && q2Kind !== q1Kind,
+  )
   const sessions: PlannedSession[] = []
 
   const restDay = profile.restDay ?? 7
@@ -351,19 +440,20 @@ export function generatePlanWeek(opts: GenerateWeekOptions): Plan {
   )
 
   if (bp.raceWeek) {
-    const q1 = workoutDetails(bp.q1, vdot)
-    const q2 = workoutDetails(bp.q2, vdot)
-    const q1Km = totalKmForWorkout(bp.q1, vdot)
-    const q2Km = totalKmForWorkout(bp.q2, vdot)
+    const q1 = workoutDetails(q1Bp, vdot)
+    const q2 = workoutDetails(q2Bp, vdot)
+    const q1Km = totalKmForWorkout(q1Bp, vdot)
+    const q2Km = totalKmForWorkout(q2Bp, vdot)
     const raceKm = 9
     const alloc = allocateEasyKm(targetKm, q1Km, q2Km + raceKm, 0)
 
     sessions.push(
       simpleSession(dayDate(q1Day), 'repetition', q1.title, q1.details, {
-        zone: bp.q1.zone,
+        zone: q1Bp.zone,
         distanceM: q1.distanceM,
         targetPace: q1.targetPace,
-        purpose: bp.q1.purpose,
+        workout: workoutWithAdvice(q1Bp, opts.qualityAdvice),
+        purpose: q1Bp.purpose,
         downgrade: '状态黄：减到 3 组；红：改 20 min 轻松跑',
       }),
     )
@@ -377,10 +467,11 @@ export function generatePlanWeek(opts: GenerateWeekOptions): Plan {
     )
     sessions.push(
       simpleSession(dayDate(q2Day), 'repetition', q2.title, q2.details, {
-        zone: bp.q2.zone,
+        zone: q2Bp.zone,
         distanceM: q2.distanceM,
         targetPace: q2.targetPace,
-        purpose: bp.q2.purpose,
+        workout: workoutWithAdvice(q2Bp, opts.qualityAdvice),
+        purpose: q2Bp.purpose,
         downgrade: '状态黄：减到 2 组；红：只做 20 min 轻松跑',
       }),
     )
@@ -414,24 +505,25 @@ export function generatePlanWeek(opts: GenerateWeekOptions): Plan {
       }),
     )
   } else {
-    const testWeek = bp.q2.kind === 'test'
-    const q1 = workoutDetails(bp.q1, vdot)
-    const q2 = workoutDetails(bp.q2, vdot)
-    const q1Km = testWeek ? 5 : totalKmForWorkout(bp.q1, vdot)
-    const q2Km = totalKmForWorkout(bp.q2, vdot)
+    const testWeek = q2Bp.kind === 'test'
+    const q1 = workoutDetails(q1Bp, vdot)
+    const q2 = workoutDetails(q2Bp, vdot)
+    const q1Km = testWeek ? 5 : totalKmForWorkout(q1Bp, vdot)
+    const q2Km = totalKmForWorkout(q2Bp, vdot)
     const alloc = allocateEasyKm(targetKm, q1Km, q2Km, bp.longKm)
 
     sessions.push(
       simpleSession(
         dayDate(q1Day),
-        testWeek ? 'easy' : bp.q1.zone === 'R' ? 'repetition' : bp.q1.zone === 'T' ? 'threshold' : 'interval',
+        testWeek ? 'easy' : q1Bp.zone === 'R' ? 'repetition' : q1Bp.zone === 'T' ? 'threshold' : 'interval',
         q1.title,
         q1.details,
         {
-          zone: bp.q1.zone,
+          zone: q1Bp.zone,
           distanceM: q1.distanceM,
           targetPace: q1.targetPace,
-          purpose: testWeek ? `${EASY_PURPOSE}；为计时赛蓄力` : bp.q1.purpose,
+          workout: workoutWithAdvice(q1Bp, opts.qualityAdvice),
+          purpose: testWeek ? `${EASY_PURPOSE}；为计时赛蓄力` : q1Bp.purpose,
           downgrade: testWeek ? '不安排质量课；只做轻松跑 + 加速跑' : '状态黄：减 1–2 组；红：30 min 轻松跑 + 4×20 s',
         },
       ),
@@ -457,16 +549,17 @@ export function generatePlanWeek(opts: GenerateWeekOptions): Plan {
     sessions.push(
       simpleSession(
         dayDate(q2Day),
-        testWeek ? 'time_trial' : bp.q2.zone === 'T' ? 'threshold' : 'interval',
+        testWeek ? 'time_trial' : q2Bp.zone === 'T' ? 'threshold' : 'interval',
         q2.title,
         q2.details,
         {
-          zone: bp.q2.zone,
+          zone: q2Bp.zone,
           distanceM: q2.distanceM,
           testDistanceM: q2.testDistanceM,
           targetPace: q2.targetPace,
           targetTimeSec: q2.targetTimeSec,
-          purpose: bp.q2.purpose,
+          workout: workoutWithAdvice(q2Bp, opts.qualityAdvice),
+          purpose: q2Bp.purpose,
           downgrade: testWeek ? '状态黄：改 3 km 节奏跑；红：改轻松跑' : '状态黄：减 1 组；红：30 min 轻松跑 + 4×20 s',
         },
       ),

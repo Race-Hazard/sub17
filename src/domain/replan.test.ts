@@ -121,4 +121,26 @@ describe('within-week replanning', () => {
     expect(futureSession(updated, '2026-10-20')?.type).toBe('easy')
     expect(futureSession(updated, '2026-10-22')?.type).toBe('easy')
   })
+
+  it('applies the last same-kind advice to the next quality session', () => {
+    const updated = replanRemainingWeek({
+      plan,
+      sessions: [],
+      checkins: [],
+      today: '2026-10-19',
+      vdot: 50,
+      readiness: 'green',
+      qualityAdvice: {
+        I: {
+          kind: 'I',
+          mode: 'interval',
+          repsDelta: 1,
+          sourceSessionId: 'last-i',
+        },
+      },
+    })
+    const tuesday = futureSession(updated, '2026-10-20')
+    expect(tuesday?.title).toContain('6 × 600 m')
+    expect(tuesday?.workout?.adviceFromSessionId).toBe('last-i')
+  })
 })

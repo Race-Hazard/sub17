@@ -8,6 +8,7 @@ import type {
   SessionType,
 } from './types'
 import { practicalEasyPace } from './vdot'
+import type { NextQualityWorkout, QualityKind } from './quality'
 
 const QUALITY_TYPES: SessionType[] = [
   'interval',
@@ -24,6 +25,7 @@ export interface ReplanInput {
   today: string
   vdot: number
   readiness: ReadinessLevel
+  qualityAdvice?: Partial<Record<QualityKind, NextQualityWorkout>>
 }
 
 function isQualityType(type: SessionType): boolean {
@@ -59,6 +61,67 @@ function setEasy(
   planned.details = details
   planned.purpose = reason
   planned.status = 'adjusted'
+}
+
+function applyPlannedAdvice(
+  planned: PlannedSession,
+  advice: Partial<Record<QualityKind, NextQualityWorkout>> | undefined,
+): string | null {
+  const workout = planned.workout
+  if (!workout || !isQualityType(planned.type)) return null
+  if (planned.type === 'time_trial' || planned.type === 'race') return null
+  const kind: QualityKind | null =
+    workout.zone === 'I'
+      ? 'I'
+      : workout.zone === 'T'
+        ? 'T'
+        : workout.zone === 'R'
+          ? 'R'
+          : workout.zone === '5K'
+            ? '5K'
+            : null
+  if (!kind) return null
+  const next = advice?.[kind]
+  if (!next) return null
+  if (
+    workout.adviceFromSessionId &&
+    workout.adviceFromSessionId === next.sourceSessionId
+  ) {
+    return null
+  }
+
+  if (next.mode === 'interval' && workout.mode === 'interval' && workout.reps) {
+    const floor = kind === 'R' ? 4 : kind === 'T' ? 2 : 3
+    const reps = clamp(workout.reps + (next.repsDelta ?? 0), floor, 16)
+    if (reps === workout.reps) return null
+    const repM = workout.repDistanceM ?? 1000
+    workout.reps = reps
+    workout.adviceFromSessionId = next.sourceSessionId
+    planned.distanceM = Math.round(((reps * repM) / 1000 + 4) * 1000)
+    planned.title = `${reps} × ${formatKm(repM)} ${workout.zone}`
+    planned.details = `按上次质量课评估调整：${reps} × ${formatKm(repM)}，组间 ${workout.recoverySec ?? 90} s 慢跑；热身/放松各 2 km。`
+    planned.status = 'adjusted'
+    return `按上次质量课评估把 ${workout.zone} 课调整为 ${reps}×${formatKm(repM)}`
+  }
+
+  if (
+    next.mode === 'continuous' &&
+    workout.mode === 'continuous' &&
+    workout.continuousMin
+  ) {
+    const min = clamp(workout.continuousMin + (next.continuousMinDelta ?? 0), 20, 40)
+    if (min === workout.continuousMin) return null
+    workout.continuousMin = min
+    workout.adviceFromSessionId = next.sourceSessionId
+    const pace = planned.targetPace
+    const avg = pace ? (pace.fastSecKm + pace.slowSecKm) / 2 : 255
+    planned.distanceM = Math.round(((min * 60) / avg + 4) * 1000)
+    planned.title = `${min} min 阈值跑`
+    planned.details = `按上次质量课评估调整：${min} min 连续阈值跑 @ 目标 T 配速；热身/放松各 2 km。`
+    planned.status = 'adjusted'
+    return `按上次质量课评估把阈值课调整为 ${min} min`
+  }
+  return null
 }
 
 /**
@@ -169,6 +232,39 @@ export function replanRemainingWeek(input: ReplanInput): Plan | null {
       at: nowIso(),
     })
     changed = true
+  }
+
+  // Apply the last same-kind quality evaluation to the remaining quality
+  // sessions: only the first session of each kind, after recovery downgrades.
+  const advisedKinds = new Set<QualityKind>()
+  for (const session of future) {
+    if (!isQualityType(session.type)) continue
+    const zone = session.workout?.zone
+    const kind: QualityKind | null =
+      zone === 'I'
+        ? 'I'
+        : zone === 'T'
+          ? 'T'
+          : zone === 'R'
+            ? 'R'
+            : zone === '5K'
+              ? '5K'
+              : null
+    if (kind) {
+      if (advisedKinds.has(kind)) continue
+      advisedKinds.add(kind)
+    }
+    const reason = applyPlannedAdvice(session, input.qualityAdvice)
+    if (reason) {
+      reasons.push(reason)
+      newAdjustments.push({
+        plannedSessionId: session.id,
+        action: 'apply-advice',
+        reason,
+        at: nowIso(),
+      })
+      changed = true
+    }
   }
 
   // Keep weekly volume near target by adjusting only future easy days.

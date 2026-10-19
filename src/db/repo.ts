@@ -1,5 +1,6 @@
 import { addDaysIso, mondayOf, nowIso, uid } from '../domain/format'
 import { generatePlanWeek } from '../domain/plan'
+import type { NextQualityWorkout, QualityKind } from '../domain/quality'
 import type {
   Checkin,
   IsoDate,
@@ -155,13 +156,21 @@ export async function ensurePlanForWeek(
   profile: Profile,
   rationale?: string,
   activate = false,
+  qualityAdvice?: Partial<Record<QualityKind, NextQualityWorkout>>,
 ): Promise<Plan> {
   const existing = await getPlanForWeek(weekStart)
   if (existing) {
     if (activate) await activatePlan(existing)
     return existing
   }
-  const plan = generatePlanWeek({ weekIndex, weekStart, vdot, profile, rationale })
+  const plan = generatePlanWeek({
+    weekIndex,
+    weekStart,
+    vdot,
+    profile,
+    rationale,
+    qualityAdvice,
+  })
   try {
     if (activate) {
       await activatePlan(plan)
@@ -186,6 +195,7 @@ export async function regeneratePlanWeek(
   plan: Plan,
   vdot: number,
   profile: Profile,
+  qualityAdvice?: Partial<Record<QualityKind, NextQualityWorkout>>,
 ): Promise<Plan> {
   const next = generatePlanWeek({
     weekIndex: plan.weekIndex,
@@ -194,6 +204,7 @@ export async function regeneratePlanWeek(
     profile,
     version: plan.version + 1,
     rationale: '按最新训练设置重新生成本周课表。',
+    qualityAdvice,
   })
   const updated: Plan = {
     ...plan,

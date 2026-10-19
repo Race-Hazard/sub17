@@ -86,7 +86,12 @@ describe('quality session evaluation', () => {
     )
     expect(evaluation?.verdict).toBe('excellent')
     expect(evaluation?.verdictLabel).toBe('优秀')
-    expect(evaluation?.nextAdvice).toContain('6×')
+    expect(evaluation?.nextAdvice).toContain('+1 组')
+    expect(evaluation?.nextWorkout).toEqual({
+      kind: 'I',
+      mode: 'interval',
+      repsDelta: 1,
+    })
   })
 
   it('detects fade and tells the runner to start conservatively', () => {
@@ -140,7 +145,12 @@ describe('quality session evaluation', () => {
       50,
     )
     expect(evaluation?.reps).toBe(1)
-    expect(evaluation?.nextAdvice).toContain('35 min')
+    expect(evaluation?.nextAdvice).toContain('+5 min')
+    expect(evaluation?.nextWorkout).toEqual({
+      kind: 'T',
+      mode: 'continuous',
+      continuousMinDelta: 5,
+    })
   })
 
   it('summarizes the latest evaluation and latest per kind', () => {

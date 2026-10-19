@@ -6,6 +6,7 @@ import {
   complianceForPlan,
   latestCheckpointVerdict,
 } from '../domain/coach'
+import { qualityAdviceFromSummary } from '../domain/quality'
 import {
   addDaysIso,
   formatKm,
@@ -66,6 +67,8 @@ export function PlanPage({
       status.currentVdot,
       profile,
       `第 ${nextWeekIndex} 周：${adjustment.rationale}`,
+      false,
+      qualityAdviceFromSummary(status.quality),
     )
     setMessage(`${plan.weekStart} 周已生成：目标 ${plan.targetKm} km。${adjustment.rationale}`)
     setGenerating(false)
@@ -81,7 +84,12 @@ export function PlanPage({
       return
     }
     setGenerating(true)
-    const updated = await regeneratePlanWeek(activePlan, status.currentVdot, profile)
+    const updated = await regeneratePlanWeek(
+      activePlan,
+      status.currentVdot,
+      profile,
+      qualityAdviceFromSummary(status.quality),
+    )
     setMessage(`本周已重新生成：目标 ${updated.targetKm} km。`)
     setGenerating(false)
   }

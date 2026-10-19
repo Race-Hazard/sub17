@@ -19,6 +19,14 @@ export type QualityVerdict =
   | 'slow'
   | 'incomplete'
 
+export interface NextQualityWorkout {
+  kind: QualityKind
+  mode: 'interval' | 'continuous'
+  repsDelta?: number
+  continuousMinDelta?: number
+  sourceSessionId?: string
+}
+
 export interface QualityEvaluation {
   sessionId: string
   date: IsoDate
@@ -38,6 +46,8 @@ export interface QualityEvaluation {
   verdictLabel: string
   summary: string
   nextAdvice: string
+  nextWorkout: NextQualityWorkout | null
+  isSeed?: boolean
 }
 
 export interface QualitySummary {
@@ -202,26 +212,73 @@ function verdictFor(input: {
   return 'onTarget'
 }
 
+function buildNextWorkout(
+  kind: QualityKind,
+  verdict: QualityVerdict,
+  reps: number,
+  continuousMin: number | undefined,
+): NextQualityWorkout | null {
+  if (kind === 'TEST') return null
+  const isContinuous = kind === 'T' && (continuousMin != null || reps <= 1)
+  if (isContinuous) {
+    const delta =
+      verdict === 'excellent' || verdict === 'onTarget'
+        ? 5
+        : verdict === 'slow' || verdict === 'overload'
+          ? -5
+          : 0
+    return { kind, mode: 'continuous', continuousMinDelta: delta }
+  }
+  let delta = 0
+  if (kind === 'R') {
+    delta =
+      verdict === 'excellent'
+        ? 2
+        : verdict === 'onTarget'
+          ? 1
+          : verdict === 'slow' || verdict === 'overload'
+            ? -2
+            : 0
+  } else if (kind === 'I' || kind === '5K') {
+    delta =
+      verdict === 'excellent' || verdict === 'onTarget'
+        ? 1
+        : verdict === 'slow' || verdict === 'overload'
+          ? -1
+          : 0
+  } else if (kind === 'T') {
+    delta =
+      verdict === 'excellent' || verdict === 'onTarget'
+        ? 1
+        : verdict === 'overload'
+          ? -1
+          : 0
+  }
+  return { kind, mode: 'interval', repsDelta: delta }
+}
+
 function adviceFor(
   kind: QualityKind,
   verdict: QualityVerdict,
   reps: number,
   repDistanceM: number | undefined,
+  continuousMin: number | undefined,
   target: PaceRange | null,
   vdot: number,
+  nextWorkout: NextQualityWorkout | null,
 ): string {
   const pace = target ?? trainingPaces(vdot)[kind === 'TEST' || kind === '5K' ? 'I' : kind]
   const paceText = formatPaceRange(pace.fastSecKm, pace.slowSecKm)
   const repText = repDistanceM ? `${Math.round(repDistanceM / 100) * 100} m` : '组'
   const repCount = Math.max(1, reps)
-  const recovery =
-    kind === 'T' && repCount <= 1
-      ? '连续完成，不设组间恢复'
-      : kind === 'T'
-        ? '组间 60–90 s'
-        : kind === 'R'
-          ? '充分恢复 2–3 min'
-          : '组间 2–3 min 慢跑'
+  const continuous = nextWorkout?.mode === 'continuous' || (kind === 'T' && repCount <= 1)
+  const recovery = continuous
+    ? '连续完成，不设组间恢复'
+    : kind === 'T'
+      ? '组间 60–90 s'
+      : kind === 'R'
+        ? '充分恢复 2–3 min'
+        : '组间 2–3 min 慢跑'
 
   let volume = `${repCount}×${repText}`
   if (kind === 'TEST') {
@@ -231,57 +288,44 @@ function adviceFor(
         : verdict === 'fade'
           ? '3×1 km @ 5K 配速'
           : '先恢复 2 周，再做 3×1 km @ 5K'
-  } else if (kind === 'T' && repCount <= 1) {
+  } else if (nextWorkout?.mode === 'continuous') {
+    const delta = nextWorkout.continuousMinDelta ?? 0
     volume =
-      verdict === 'excellent' || verdict === 'onTarget'
-        ? '35 min 连续阈值跑'
-        : '30 min 连续阈值跑'
-  } else if (verdict === 'excellent') {
+      delta === 0
+        ? `保持计划时长（本次 ${continuousMin ?? '—'} min）`
+        : `计划基础上 ${delta > 0 ? '+' : ''}${delta} min（本次 ${continuousMin ?? '—'} min）`
+  } else if (nextWorkout) {
+    const delta = nextWorkout.repsDelta ?? 0
     volume =
-      kind === 'R'
-        ? `${repCount + 2}×${repText}`
-        : kind === 'I'
-          ? `${repCount + 1}×${repText}`
-          : `${repCount + 1}×2 km`
-  } else if (verdict === 'onTarget') {
-    volume =
-      kind === 'R'
-        ? `${repCount + 1}×${repText}`
-        : kind === 'I'
-          ? `${repCount + 1}×${repText}`
-          : `${repCount}×2 km`
-  } else if (verdict === 'overload') {
-    volume =
-      kind === 'R'
-        ? `${Math.max(4, repCount - 2)}×${repText}`
-        : kind === 'I'
-          ? `${Math.max(4, repCount - 1)}×${repText}`
-          : `${Math.max(2, repCount - 1)}×2 km`
-  } else if (verdict === 'slow') {
-    volume =
-      kind === 'R'
-        ? `${Math.max(4, repCount - 1)}×${repText}`
-        : kind === 'I'
-          ? `${Math.max(4, repCount - 1)}×${repText}`
-          : `${Math.max(2, repCount)}×2 km`
+      delta === 0
+        ? `保持计划组数（本次 ${repCount}×${repText}）`
+        : `计划基础上 ${delta > 0 ? '+' : ''}${delta} 组（本次 ${repCount}×${repText}）`
   }
 
-  const cue =
-    verdict === 'excellent'
-      ? '可以加 1 组或缩短 15 s 恢复，但不要同时加量又提速。'
+  const cue = continuous
+    ? verdict === 'excellent' || verdict === 'onTarget'
+      ? '可以加 5 min，但不要同时提速。'
+      : verdict === 'overload' || verdict === 'slow'
+        ? '下次减 5 min，先稳住目标配速；必要时重测 VDOT。'
+        : verdict === 'fast'
+          ? '保持同量，不要继续加速；安排一次 5 km 计时赛校准 VDOT。'
+          : '保持同量，先稳住节奏。'
+    : verdict === 'excellent'
+      ? '可以加组或缩短 15 s 恢复，但不要同时加量又提速。'
       : verdict === 'onTarget'
         ? '保持同样结构，最后 1–2 组再提速。'
         : verdict === 'fade'
-          ? '前 1–2 组刻意慢 2–3 s/400 m，先稳后快；下周同量，不加组。'
+          ? '前 1–2 组刻意慢 2–3 s/400 m，先稳后快；下次同量，不加组。'
           : verdict === 'overload'
             ? '这次强度偏高；先保睡眠和轻松跑，下次减量，不追配速。'
             : verdict === 'fast'
               ? '这次快于目标但 RPE 不高；保持同量，不要继续加速，安排一次 5 km 计时赛校准 VDOT。'
               : verdict === 'slow'
-              ? '这次没有达到目标配速；下次同量或减 1 组，先稳住节奏，必要时重测 VDOT。'
-              : '重复同量，不追加组数；检查睡眠、疼痛和当天状态。'
+                ? '这次没有达到目标配速；下次同量或减 1 组，先稳住节奏，必要时重测 VDOT。'
+                : '重复同量，不追加组数；检查睡眠、疼痛和当天状态。'
 
-  return `下次同类课：${volume} @ ${paceText}/km，${recovery}。${cue}`
+  const prefix = nextWorkout ? '下次同类课（已写入计划）' : '下次同类课'
+  return `${prefix}：${volume} @ ${paceText}/km，${recovery}。${cue}`
 }
 
 export function evaluateQualitySession(
@@ -319,7 +363,23 @@ export function evaluateQualitySession(
     reps.length > 0
       ? Math.round(reps.reduce((sum, r) => sum + r.distanceM, 0) / reps.length)
       : undefined
-  const advice = adviceFor(kind, verdict, reps.length, repDistanceM, target, vdot)
+  const continuousMin =
+    planned?.workout?.mode === 'continuous'
+      ? planned.workout.continuousMin
+      : reps.length <= 1
+        ? Math.round(totalDuration / 60)
+        : undefined
+  const nextWorkout = buildNextWorkout(kind, verdict, reps.length, continuousMin)
+  const advice = adviceFor(
+    kind,
+    verdict,
+    reps.length,
+    repDistanceM,
+    continuousMin,
+    target,
+    vdot,
+    nextWorkout,
+  )
   const summary = `${KIND_LABEL[kind]} ${reps.length} 组｜平均 ${formatPace(
     avgPace,
   )}/km，最快 ${formatPace(fastest)}、最慢 ${formatPace(slowest)}${
@@ -347,6 +407,8 @@ export function evaluateQualitySession(
     verdictLabel: label(verdict),
     summary,
     nextAdvice: advice,
+    nextWorkout,
+    isSeed: session.isSeed,
   }
 }
 
@@ -356,7 +418,7 @@ export function qualitySummary(
   vdot: number,
 ): QualitySummary {
   const evaluations = sessions
-    .filter(isQualitySession)
+    .filter((s) => isQualitySession(s) && !s.isSeed)
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((s) => evaluateQualitySession(s, findPlanned(s, plans), vdot))
     .filter((e): e is QualityEvaluation => e != null)
@@ -371,4 +433,19 @@ export function qualitySummary(
     history: evaluations.slice(0, 6),
     lastByKind,
   }
+}
+
+export function qualityAdviceFromSummary(
+  summary: QualitySummary,
+): Partial<Record<QualityKind, NextQualityWorkout>> {
+  const out: Partial<Record<QualityKind, NextQualityWorkout>> = {}
+  for (const [kind, evaluation] of Object.entries(summary.lastByKind)) {
+    if (evaluation?.nextWorkout) {
+      out[kind as QualityKind] = {
+        ...evaluation.nextWorkout,
+        sourceSessionId: evaluation.sessionId,
+      }
+    }
+  }
+  return out
 }

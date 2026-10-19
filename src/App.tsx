@@ -21,6 +21,7 @@ import {
 } from './db/repo'
 import { addDaysIso, nowIso, todayIso, mondayOf, weekdayIndex } from './domain/format'
 import { replanRemainingWeek } from './domain/replan'
+import { qualityAdviceFromSummary, qualitySummary } from './domain/quality'
 import { getWeekIndex, weeklyTargetKm } from './domain/plan'
 import { adjustNextWeek, latestCheckpointVerdict } from './domain/coach'
 import { initSync, setupSyncListeners } from './sync/engine'
@@ -118,13 +119,16 @@ export default function App() {
       return
     }
     const weekIndex = getWeekIndex(profile.startDate, today)
+    const vdot = vdotNow(sessions, profile, today)
+    const advice = qualityAdviceFromSummary(qualitySummary(sessions, plans, vdot))
     void ensurePlanForWeek(
       weekIndex,
       weekStart,
-      vdotNow(sessions, profile, today),
+      vdot,
       profile,
       undefined,
       true,
+      advice,
     )
   }, [seeded, profile, onboarded, today, plans, sessions])
 
@@ -147,6 +151,7 @@ export default function App() {
       checkins,
       profile,
       activePlan: active,
+      plans,
       today,
     })
     const adjustment = adjustNextWeek({
@@ -171,6 +176,7 @@ export default function App() {
       profile,
       `自动生成：${adjustment.rationale}`,
       false,
+      qualityAdviceFromSummary(snapshot.quality),
     )
   }, [seeded, profile, onboarded, today, plans, sessions, sleeps, checkins, minuteTick])
 
@@ -203,6 +209,7 @@ export default function App() {
           checkins,
           profile,
           activePlan,
+          plans,
           today,
         })
         const next = replanRemainingWeek({
@@ -212,6 +219,7 @@ export default function App() {
           today,
           vdot: snapshot.currentVdot,
           readiness: snapshot.readiness.level,
+          qualityAdvice: qualityAdviceFromSummary(snapshot.quality),
         })
         if (next) await savePlan(next)
         await setMeta('lastReplanAt', nowIso())

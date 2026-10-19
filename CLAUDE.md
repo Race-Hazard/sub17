@@ -34,7 +34,7 @@
 ```bash
 cd /home/hazard/sub17
 npm run dev        # http://localhost:5173/
-npm test           # Vitest，当前 70 个测试
+npm test           # Vitest，当前 72 个测试
 npm run build      # 产出 dist/（base=/sub17/）
 npm run preview    # http://localhost:4173/sub17/
 node scripts/screenshot.mjs   # 需 npx playwright install chromium
@@ -68,7 +68,7 @@ vite.config.ts  base=/sub17/；vite-plugin-pwa；Vitest 配置
 - 状态：VDOT/5 km 等价/配速/ACWR/里程碑/周报
 - 同步：打开+保存后自动 pull+merge+push；按记录合并；tombstone 传播删除；设置页可手动同步/从云端覆盖
 - 实际训练重排：`src/domain/replan.ts`；App 在保存/删除后自动重排本周未来几天（48h 规则、重复质量/长距离降级、跑量补偿），不改已完成记录和周日休息
-- 质量课评估：`src/domain/quality.ts`；每次间歇/阈值/重复/计时赛后自动评价（优秀/达标/前快后慢/快于目标/慢于目标/过载/未完成），状态页、今日页、计划页显示评价和下次同类课建议；VDOT 仍只由计时赛更新
+- 质量课评估：`src/domain/quality.ts`；每次间歇/阈值/重复/计时赛后自动评价（优秀/达标/前快后慢/快于目标/慢于目标/过载/未完成），状态页、今日页、计划页显示评价和下次同类课建议；建议以 repsDelta/continuousMinDelta 自动写入下一次同类计划（sourceSessionId 防重复叠加）；VDOT 仍只由计时赛更新
 - 更新提示：`src/components/UpdatePrompt.tsx`；新 SW waiting 时显示「重启更新」，点击 SKIP_WAITING + reload，数据不丢
 - 提醒：App 内 20:30/07:30 + `.ics` 日历；没有后台推送
 - 未做：OCR、FIT、Strava/Garmin、后台 Web Push

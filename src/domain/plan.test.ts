@@ -94,6 +94,28 @@ describe('26-week plan generation', () => {
     expect(plan.plannedSessions[6].type).toBe('rest')
   })
 
+  it('applies the last quality advice to the next same-kind blueprint', () => {
+    const plan = generatePlanWeek({
+      weekIndex: 1,
+      weekStart: '2026-10-19',
+      vdot: 50,
+      profile,
+      qualityAdvice: {
+        I: {
+          kind: 'I',
+          mode: 'interval',
+          repsDelta: 1,
+          sourceSessionId: 'last-i',
+        },
+      },
+    })
+    const tuesday = plan.plannedSessions.find((s) => s.date === '2026-10-20')
+    expect(tuesday?.title).toContain('6 × 600 m')
+    expect(tuesday?.workout?.adviceFromSessionId).toBe('last-i')
+    const thursday = plan.plannedSessions.find((s) => s.date === '2026-10-22')
+    expect(thursday?.title).not.toContain('6 × 600 m')
+  })
+
   it('keeps Sunday rest, Saturday long, and Tue/Thu quality every week', () => {
     for (const bp of WEEK_BLUEPRINTS) {
       const plan = generatePlanWeek({

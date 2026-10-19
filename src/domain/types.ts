@@ -98,6 +98,16 @@ export interface PaceRange {
   slowSecKm: number
 }
 
+export interface PlannedWorkout {
+  mode: 'interval' | 'continuous'
+  zone: TrainingZone
+  reps?: number
+  repDistanceM?: number
+  recoverySec?: number
+  continuousMin?: number
+  adviceFromSessionId?: string
+}
+
 export interface PlannedSession {
   id: string
   date: IsoDate
@@ -110,6 +120,7 @@ export interface PlannedSession {
   durationMin?: number
   targetPace?: PaceRange | null
   targetTimeSec?: number
+  workout?: PlannedWorkout
   purpose: string
   details: string
   downgrade: string
@@ -119,7 +130,12 @@ export interface PlannedSession {
 
 export interface PlanAdjustment {
   plannedSessionId: string
-  action: 'downgrade-easy' | 'downgrade-rest' | 'reduce-volume' | 'adjust-volume'
+  action:
+    | 'downgrade-easy'
+    | 'downgrade-rest'
+    | 'reduce-volume'
+    | 'adjust-volume'
+    | 'apply-advice'
   reason: string
   at: string
 }
