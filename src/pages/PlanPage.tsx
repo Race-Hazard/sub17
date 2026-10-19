@@ -142,6 +142,20 @@ export function PlanPage({
         <p className="text-xs leading-relaxed text-muted">{activePlan.rationale}</p>
       </Card>
 
+      {activePlan.adjustments.length > 0 ? (
+        <Card className="space-y-1.5">
+          <div className="text-xs font-semibold text-slate-200">最近按实际训练调整</div>
+          {activePlan.adjustments
+            .slice(-3)
+            .reverse()
+            .map((adjustment, index) => (
+              <div key={`${adjustment.plannedSessionId}-${index}`} className="text-[11px] leading-relaxed text-muted">
+                · {adjustment.reason}
+              </div>
+            ))}
+        </Card>
+      ) : null}
+
       <SectionTitle>本周课表</SectionTitle>
       <div className="space-y-2">
         {activePlan.plannedSessions.map((planned) => {
@@ -190,7 +204,7 @@ export function PlanPage({
           </div>
         </div>
         <p className="text-[11px] leading-relaxed text-muted">
-          依据最近完成度、准备度、ACWR 与睡眠债调整；周中只做安全降级，不重写已生成的课表。
+          依据最近完成度、准备度、ACWR、睡眠债和实际训练调整；周中会重排未来几天，不改已完成记录，也不会改掉周日休息。
         </p>
         {message ? <div className="rounded-xl border border-good/25 bg-good/10 px-3 py-2 text-xs text-good">{message}</div> : null}
       </Card>

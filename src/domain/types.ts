@@ -119,7 +119,7 @@ export interface PlannedSession {
 
 export interface PlanAdjustment {
   plannedSessionId: string
-  action: 'downgrade-easy' | 'downgrade-rest' | 'reduce-volume'
+  action: 'downgrade-easy' | 'downgrade-rest' | 'reduce-volume' | 'adjust-volume'
   reason: string
   at: string
 }

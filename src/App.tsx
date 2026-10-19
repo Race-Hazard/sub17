@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Settings as SettingsIcon } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { BottomNav, type TabKey } from './components/BottomNav'
+import { UpdatePrompt } from './components/UpdatePrompt'
 import { Onboarding } from './pages/Onboarding'
 import { Today } from './pages/Today'
 import { Log } from './pages/Log'
@@ -11,8 +12,15 @@ import { SleepPage } from './pages/SleepPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { db } from './db/schema'
 import { ensureSeed } from './db/seed'
-import { activateCurrentWeekPlan, ensurePlanForWeek } from './db/repo'
-import { addDaysIso, todayIso, mondayOf, weekdayIndex } from './domain/format'
+import {
+  activateCurrentWeekPlan,
+  ensurePlanForWeek,
+  getMeta,
+  savePlan,
+  setMeta,
+} from './db/repo'
+import { addDaysIso, nowIso, todayIso, mondayOf, weekdayIndex } from './domain/format'
+import { replanRemainingWeek } from './domain/replan'
 import { getWeekIndex, weeklyTargetKm } from './domain/plan'
 import { adjustNextWeek, latestCheckpointVerdict } from './domain/coach'
 import { initSync, setupSyncListeners } from './sync/engine'
@@ -58,6 +66,7 @@ export default function App() {
   const [logKey, setLogKey] = useState(0)
   const ensuredRef = useRef('')
   const autoNextRef = useRef('')
+  const replanRef = useRef(false)
 
   const profile = useLiveQuery(() => db.profile.get('me'), [])
   const sessions = useLiveQuery(() => db.sessions.toArray(), []) ?? EMPTY_SESSIONS
@@ -164,6 +173,55 @@ export default function App() {
       false,
     )
   }, [seeded, profile, onboarded, today, plans, sessions, sleeps, checkins, minuteTick])
+
+  // When today's actual training differs from the plan, rebuild the rest of
+  // the current week (future days only).
+  useEffect(() => {
+    if (!seeded || !profile || !onboarded || !activePlan) return
+    if (mondayOf(today) !== activePlan.weekStart) return
+    if (replanRef.current) return
+    const weekStart = activePlan.weekStart
+    const weekEnd = addDaysIso(weekStart, 6)
+    const actuals = [
+      ...sessions.filter((s) => s.date >= weekStart && s.date <= weekEnd),
+      ...checkins.filter((c) => c.date >= weekStart && c.date <= weekEnd),
+    ]
+    const latestActual = actuals.reduce(
+      (max, item) => (item.updatedAt > max ? item.updatedAt : max),
+      '',
+    )
+    if (!latestActual) return
+
+    replanRef.current = true
+    void (async () => {
+      try {
+        const lastReplan = (await getMeta('lastReplanAt')) ?? ''
+        if (lastReplan && latestActual <= lastReplan) return
+        const snapshot = computeStatus({
+          sessions,
+          sleeps,
+          checkins,
+          profile,
+          activePlan,
+          today,
+        })
+        const next = replanRemainingWeek({
+          plan: activePlan,
+          sessions,
+          checkins,
+          today,
+          vdot: snapshot.currentVdot,
+          readiness: snapshot.readiness.level,
+        })
+        if (next) await savePlan(next)
+        await setMeta('lastReplanAt', nowIso())
+      } catch (error) {
+        console.error('replan failed', error)
+      } finally {
+        replanRef.current = false
+      }
+    })()
+  }, [seeded, profile, onboarded, activePlan, sessions, checkins, sleeps, today])
 
   if (!seeded || !profile) {
     return (
@@ -296,6 +354,7 @@ export default function App() {
         ) : null}
         {page}
       </main>
+      <UpdatePrompt />
       <BottomNav
         active={tab}
         onChange={(next) => {

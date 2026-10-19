@@ -26,7 +26,7 @@
   - 使用只授权该仓库的 fine-grained token（Contents: Read and write）；token 只在 App 本机 localStorage，**不要写入仓库或聊天**
 - Git remote 已改为 SSH：`git@github.com:Race-Hazard/sub17.git`
 - `git push` 后 GitHub Actions 自动测试、构建、部署 Pages；不需要手动上传 dist
-- 最新提交：目标优先计划（周日休息、周六长距离、68–72 km/周）
+- 最新提交：目标优先计划（周日休息、周六长距离、68–72 km/周）+ 实际训练重排 + PWA 更新提示
 - 之前：`ba0fef7`（阈值分组 + 按时间模式）、`30a7ac0`（私有 GitHub 同步）
 
 ## 常用命令
@@ -67,6 +67,8 @@ vite.config.ts  base=/sub17/；vite-plugin-pwa；Vitest 配置
 - 计划：26 周、检查点 W4/8/12/16/20/26、按完成度/准备度/ACWR/睡眠/检查点调整
 - 状态：VDOT/5 km 等价/配速/ACWR/里程碑/周报
 - 同步：打开+保存后自动 pull+merge+push；按记录合并；tombstone 传播删除；设置页可手动同步/从云端覆盖
+- 实际训练重排：`src/domain/replan.ts`；App 在保存/删除后自动重排本周未来几天（48h 规则、重复质量/长距离降级、跑量补偿），不改已完成记录和周日休息
+- 更新提示：`src/components/UpdatePrompt.tsx`；新 SW waiting 时显示「重启更新」，点击 SKIP_WAITING + reload，数据不丢
 - 提醒：App 内 20:30/07:30 + `.ics` 日历；没有后台推送
 - 未做：OCR、FIT、Strava/Garmin、后台 Web Push
 

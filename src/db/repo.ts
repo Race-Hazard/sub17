@@ -51,6 +51,7 @@ export async function deleteSession(id: string): Promise<void> {
     await db.tombstones.put({ key: id, kind: 'session', at: nowIso() })
     await db.sessions.delete(id)
   })
+  await db.meta.put({ key: 'lastReplanAt', value: '' })
   markDirty()
 }
 
@@ -75,6 +76,7 @@ export async function deleteCheckin(date: IsoDate): Promise<void> {
     })
     await db.checkins.delete(date)
   })
+  await db.meta.put({ key: 'lastReplanAt', value: '' })
   markDirty()
 }
 
