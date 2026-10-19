@@ -70,12 +70,12 @@ export function goalConfidence(
 }
 
 export const MILESTONES: Milestone[] = [
-  { week: 4, distanceM: 5000, targetSec: 19 * 60 + 30, label: '5 km 19:30', note: '校准 2 km 是否偏保守' },
-  { week: 8, distanceM: 5000, targetSec: 19 * 60, label: '5 km 19:00', note: '第一个可验证门槛' },
-  { week: 12, distanceM: 3000, targetSec: 10 * 60 + 55, label: '3 km 10:55', note: '阈值能力提升' },
-  { week: 16, distanceM: 5000, targetSec: 18 * 60 + 25, label: '5 km 18:25', note: '进入 sub-18:30' },
-  { week: 20, distanceM: 5000, targetSec: 18 * 60 + 5, label: '5 km 18:05', note: '专项耐力成型，决定最终配速' },
-  { week: 26, distanceM: 5000, targetSec: 17 * 60 + 50, label: '5 km 17:50', note: 'sub-17 为 stretch' },
+  { week: 4, distanceM: 5000, targetSec: 19 * 60 + 15, label: '5 km 19:15', note: '目标优先：第一次校准' },
+  { week: 8, distanceM: 5000, targetSec: 18 * 60 + 45, label: '5 km 18:45', note: '必须达标；否则不加量' },
+  { week: 12, distanceM: 3000, targetSec: 10 * 60 + 50, label: '3 km 10:50', note: '5k ≈ 18:15' },
+  { week: 16, distanceM: 5000, targetSec: 17 * 60 + 55, label: '5 km 17:55', note: '进入 sub-18:00' },
+  { week: 20, distanceM: 5000, targetSec: 17 * 60 + 30, label: '5 km 17:30', note: '关键门槛，决定最终目标' },
+  { week: 26, distanceM: 5000, targetSec: 17 * 60, label: '5 km 17:00', note: 'sub-17 目标' },
 ]
 
 export function milestoneForWeek(week: number): Milestone | undefined {

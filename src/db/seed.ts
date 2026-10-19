@@ -24,9 +24,10 @@ export function defaultProfile(seedEnd: IsoDate, today: IsoDate = seedEnd): Prof
     goalDate,
     startDate,
     daysPerWeek: 6,
-    qualityDays: [2, 5],
-    longRunDay: 7,
-    sleepTargetMin: 7.5 * 60,
+    qualityDays: [2, 4],
+    longRunDay: 6,
+    restDay: 7,
+    sleepTargetMin: 8 * 60,
     reminderTime: '20:30',
     sleepReminderTime: '07:30',
     seedVdot: 50,
@@ -212,8 +213,23 @@ export function buildSeedCheckins(seedEnd: IsoDate): Checkin[] {
 export async function ensureSeed(today = todayIso()): Promise<{ seeded: boolean; profile: Profile }> {
   const existingProfile = await db.profile.get('me')
   const meta = await db.meta.get('seedVersion')
-  if (existingProfile && meta?.value === SEED_VERSION) {
-    return { seeded: false, profile: existingProfile }
+  if (existingProfile) {
+    // One-time schedule migration: Sunday rest, Tue/Thu quality, Saturday long.
+    if (existingProfile.restDay == null) {
+      const migrated: Profile = {
+        ...existingProfile,
+        qualityDays: [2, 4],
+        longRunDay: 6,
+        restDay: 7,
+        sleepTargetMin: 8 * 60,
+        updatedAt: nowIso(),
+      }
+      await db.profile.put(migrated)
+      return { seeded: false, profile: migrated }
+    }
+    if (meta?.value === SEED_VERSION) {
+      return { seeded: false, profile: existingProfile }
+    }
   }
 
   const seedEnd = seedEndFor(today)

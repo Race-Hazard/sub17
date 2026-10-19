@@ -179,6 +179,36 @@ export async function ensurePlanForWeek(
   }
 }
 
+/** Manually rebuild the current week with the latest schedule/volume settings. */
+export async function regeneratePlanWeek(
+  plan: Plan,
+  vdot: number,
+  profile: Profile,
+): Promise<Plan> {
+  const next = generatePlanWeek({
+    weekIndex: plan.weekIndex,
+    weekStart: plan.weekStart,
+    vdot,
+    profile,
+    version: plan.version + 1,
+    rationale: '按最新训练设置重新生成本周课表。',
+  })
+  const updated: Plan = {
+    ...plan,
+    version: plan.version + 1,
+    phase: next.phase,
+    targetKm: next.targetKm,
+    rationale: next.rationale,
+    plannedSessions: next.plannedSessions,
+    adjustments: [],
+    createdAt: nowIso(),
+    status: 'active',
+  }
+  await db.plans.put(updated)
+  markDirty()
+  return updated
+}
+
 /** Call on app start: make the plan for the current Monday active. */
 export async function activateCurrentWeekPlan(today: IsoDate): Promise<Plan | undefined> {
   const weekStart = mondayOf(today)

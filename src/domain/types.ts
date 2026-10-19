@@ -144,8 +144,9 @@ export interface Profile {
   goalDate: IsoDate
   startDate: IsoDate // first plan Monday
   daysPerWeek: number
-  qualityDays: number[] // 2 = Tuesday, 5 = Friday (1=Mon)
-  longRunDay: number // 7 = Sunday
+  qualityDays: number[] // 1=Mon ... 7=Sun
+  longRunDay: number // 6 = Saturday
+  restDay?: number // 7 = Sunday
   sleepTargetMin: number
   reminderTime: string // HH:mm
   sleepReminderTime: string // HH:mm

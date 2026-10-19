@@ -4,6 +4,7 @@ import {
   formatDuration,
   formatKm,
   formatPaceRange,
+  formatWeekday,
   mondayOf,
   round,
   uid,
@@ -43,6 +44,7 @@ interface WeekBlueprint {
   longNote?: string
   down?: boolean
   raceWeek?: boolean
+  raceTargetSec?: number
 }
 
 const EASY_PURPOSE = '有氧恢复，保持轻松可对话'
@@ -90,36 +92,36 @@ const PHASE_NAMES: Record<Phase, string> = {
  * derived from the current VDOT when a week is generated.
  */
 export const WEEK_BLUEPRINTS: WeekBlueprint[] = [
-  { week: 1, phase: 1, targetKm: 36, longKm: 10, q1: interval(4, 600, 'I', 120, '建立速度耐力，不追求极限'), q2: continuous(20, 'T', '引入阈值刺激') },
-  { week: 2, phase: 1, targetKm: 38, longKm: 11, q1: interval(6, 600, 'I', 120, '延长 VO2max 刺激'), q2: continuous(22, 'T', '阈值巡航') },
-  { week: 3, phase: 1, targetKm: 40, longKm: 12, q1: interval(6, 800, 'I', 120, 'VO2max 刺激'), q2: interval(3, 2000, 'T', 90, '阈值分段') },
-  { week: 4, phase: 1, targetKm: 32, longKm: 9, down: true, q1: EASY_Q1, q2: test(5000, 19 * 60 + 30, '第一次 5 km 校准，判断 2 km 是否偏保守') },
-  { week: 5, phase: 1, targetKm: 42, longKm: 13, q1: interval(5, 1000, 'I', 150, 'VO2max 刺激'), q2: continuous(30, 'T', '阈值巡航') },
-  { week: 6, phase: 1, targetKm: 44, longKm: 14, q1: interval(8, 400, 'R', 90, '速度与跑步经济性'), q2: interval(3, 2000, 'T', 90, '阈值分段') },
+  { week: 1, phase: 1, targetKm: 40, longKm: 12, q1: interval(5, 600, 'I', 120, '建立速度耐力，不追求极限'), q2: continuous(25, 'T', '引入阈值刺激') },
+  { week: 2, phase: 1, targetKm: 44, longKm: 13, q1: interval(6, 600, 'I', 120, '延长 VO2max 刺激'), q2: continuous(28, 'T', '阈值巡航') },
+  { week: 3, phase: 1, targetKm: 48, longKm: 14, q1: interval(6, 800, 'I', 120, 'VO2max 刺激'), q2: interval(3, 2000, 'T', 90, '阈值分段') },
+  { week: 4, phase: 1, targetKm: 38, longKm: 10, down: true, q1: EASY_Q1, q2: test(5000, 19 * 60 + 15, '目标优先第一次校准') },
+  { week: 5, phase: 1, targetKm: 52, longKm: 15, q1: interval(6, 1000, 'I', 150, 'VO2max 刺激'), q2: continuous(30, 'T', '阈值巡航') },
+  { week: 6, phase: 1, targetKm: 56, longKm: 15, q1: interval(8, 400, 'R', 90, '速度与跑步经济性'), q2: interval(3, 2000, 'T', 90, '阈值分段') },
 
-  { week: 7, phase: 2, targetKm: 45, longKm: 15, q1: interval(4, 1000, 'I', 75, '阈值与 VO2 交界'), q2: interval(2, 2000, 'T', 90, '阈值分段') },
-  { week: 8, phase: 2, targetKm: 36, longKm: 12, down: true, q1: EASY_Q1, q2: test(5000, 19 * 60, '第二个 5 km 门槛') },
-  { week: 9, phase: 2, targetKm: 48, longKm: 15, q1: interval(5, 1000, 'I', 75, '阈值与 VO2 交界'), q2: interval(3, 2000, 'T', 90, '阈值分段') },
-  { week: 10, phase: 2, targetKm: 50, longKm: 16, q1: interval(6, 1000, 'I', 75, 'VO2max 刺激'), q2: interval(2, 2000, 'T', 90, '阈值分段'), longNote: '最后 3 km @ M' },
-  { week: 11, phase: 2, targetKm: 51, longKm: 16, q1: interval(5, 1000, 'T', 75, '阈值维持'), q2: continuous(32, 'T', '连续阈值巡航') },
-  { week: 12, phase: 2, targetKm: 40, longKm: 14, down: true, q1: EASY_Q1, q2: test(3000, 10 * 60 + 55, '3 km 阈值校准') },
+  { week: 7, phase: 2, targetKm: 60, longKm: 16, q1: interval(5, 1000, 'I', 75, '阈值与 VO2 交界'), q2: interval(3, 2000, 'T', 90, '阈值分段') },
+  { week: 8, phase: 2, targetKm: 46, longKm: 12, down: true, q1: EASY_Q1, q2: test(5000, 18 * 60 + 45, '第二个 5 km 门槛，必须达标') },
+  { week: 9, phase: 2, targetKm: 62, longKm: 16, q1: interval(6, 1000, 'I', 75, '阈值与 VO2 交界'), q2: interval(4, 2000, 'T', 90, '阈值分段') },
+  { week: 10, phase: 2, targetKm: 65, longKm: 17, q1: interval(6, 1000, 'I', 75, 'VO2max 刺激'), q2: interval(2, 3000, 'T', 120, '长阈值分段'), longNote: '最后 3 km @ M' },
+  { week: 11, phase: 2, targetKm: 67, longKm: 17, q1: interval(6, 1000, 'T', 75, '阈值维持'), q2: continuous(35, 'T', '连续阈值巡航') },
+  { week: 12, phase: 2, targetKm: 50, longKm: 13, down: true, q1: EASY_Q1, q2: test(3000, 10 * 60 + 50, '3 km 阈值校准') },
 
-  { week: 13, phase: 3, targetKm: 52, longKm: 15, q1: interval(5, 1000, 'I', 150, '5K 专项 VO2'), q2: interval(3, 1600, 'T', 90, '阈值分段') },
-  { week: 14, phase: 3, targetKm: 54, longKm: 16, q1: interval(5, 1000, 'I', 150, '5K 专项 VO2'), q2: interval(3, 1600, 'T', 90, '阈值分段') },
-  { week: 15, phase: 3, targetKm: 55, longKm: 16, q1: interval(6, 1000, 'I', 150, '延长 5K 专项刺激'), q2: interval(3, 1600, 'T', 90, '阈值分段'), longNote: '最后 4 km @ 4:10–4:20' },
-  { week: 16, phase: 3, targetKm: 44, longKm: 13, down: true, q1: EASY_Q1, q2: test(5000, 18 * 60 + 25, '专项期 5 km 门槛') },
-  { week: 17, phase: 3, targetKm: 56, longKm: 16, q1: interval(6, 800, 'I', 120, '5K 专项 VO2'), q2: interval(2, 2000, '5K', 120, '5K 配速适应') },
-  { week: 18, phase: 3, targetKm: 56, longKm: 16, q1: interval(4, 1200, 'I', 180, '5K 专项 VO2'), q2: interval(2, 2000, '5K', 120, '5K 配速适应') },
+  { week: 13, phase: 3, targetKm: 68, longKm: 17, q1: interval(6, 1000, 'I', 150, '5K 专项 VO2'), q2: interval(4, 1600, 'T', 90, '阈值分段') },
+  { week: 14, phase: 3, targetKm: 70, longKm: 18, q1: interval(6, 1000, 'I', 150, '5K 专项 VO2'), q2: interval(3, 2000, 'T', 90, '阈值分段') },
+  { week: 15, phase: 3, targetKm: 70, longKm: 18, q1: interval(8, 800, 'I', 120, '延长 5K 专项刺激'), q2: interval(3, 2000, 'T', 90, '阈值分段'), longNote: '最后 5 km @ M/T' },
+  { week: 16, phase: 3, targetKm: 52, longKm: 13, down: true, q1: EASY_Q1, q2: test(5000, 17 * 60 + 55, '专项期 5 km 门槛') },
+  { week: 17, phase: 3, targetKm: 72, longKm: 18, q1: interval(6, 1000, 'I', 120, '5K 专项 VO2'), q2: interval(2, 3000, '5K', 120, '5K 配速适应') },
+  { week: 18, phase: 3, targetKm: 72, longKm: 18, q1: interval(8, 800, 'I', 120, '5K 专项 VO2'), q2: interval(2, 3000, '5K', 120, '5K 配速适应') },
 
-  { week: 19, phase: 4, targetKm: 56, longKm: 16, q1: interval(4, 1200, 'I', 180, '峰值 VO2'), q2: interval(3, 2000, '5K', 120, '5K 配速适应') },
-  { week: 20, phase: 4, targetKm: 45, longKm: 13, down: true, q1: EASY_Q1, q2: test(5000, 18 * 60 + 5, '专项耐力门槛，决定最终配速') },
-  { week: 21, phase: 4, targetKm: 58, longKm: 16, q1: interval(4, 1200, 'I', 180, '峰值 VO2'), q2: interval(3, 2000, '5K', 120, '5K 配速适应') },
-  { week: 22, phase: 4, targetKm: 58, longKm: 16, q1: interval(8, 400, 'R', 75, '速度和换挡'), q2: interval(2, 3000, '5K', 120, '5K 配速耐受', '最后加 4×200 m @ R') },
-  { week: 23, phase: 4, targetKm: 56, longKm: 16, q1: interval(8, 400, 'R', 75, '速度和换挡'), q2: interval(2, 3000, '5K', 120, '5K 配速耐受', '最后加 4×200 m @ R') },
+  { week: 19, phase: 4, targetKm: 72, longKm: 18, q1: interval(5, 1000, '5K', 120, '5K 配速耐受'), q2: interval(3, 2000, '5K', 120, '5K 配速适应') },
+  { week: 20, phase: 4, targetKm: 54, longKm: 14, down: true, q1: EASY_Q1, q2: test(5000, 17 * 60 + 30, '目标优先关键门槛') },
+  { week: 21, phase: 4, targetKm: 72, longKm: 18, q1: interval(5, 1000, '5K', 120, '5K 配速耐受'), q2: interval(3, 2000, '5K', 120, '5K 配速适应', '最后加 4×200 m @ R') },
+  { week: 22, phase: 4, targetKm: 72, longKm: 18, q1: interval(8, 400, 'R', 75, '速度和换挡'), q2: interval(2, 3000, '5K', 120, '5K 配速耐受', '最后加 4×200 m @ R') },
+  { week: 23, phase: 4, targetKm: 68, longKm: 17, q1: interval(6, 1000, '5K', 120, '5K 配速耐受'), q2: interval(2, 3000, '5K', 120, '5K 配速耐受') },
 
-  { week: 24, phase: 5, targetKm: 44, longKm: 12, down: true, q1: interval(4, 800, 'I', 120, '保持强度感觉'), q2: interval(2, 1000, '5K', 90, '5K 配速', '最后加 4×200 m @ R') },
-  { week: 25, phase: 5, targetKm: 38, longKm: 12, q1: interval(6, 400, '5K', 90, '5K 配速唤醒'), q2: interval(2, 1000, 'T', 90, '阈值维持') },
-  { week: 26, phase: 5, targetKm: 30, longKm: 0, raceWeek: true, q1: interval(4, 400, '5K', 90, '赛前唤醒'), q2: interval(3, 200, 'R', 90, '赛前速度感觉') },
+  { week: 24, phase: 5, targetKm: 50, longKm: 12, down: true, q1: interval(4, 800, 'I', 120, '保持强度感觉'), q2: interval(2, 1000, '5K', 90, '5K 配速', '最后加 4×200 m @ R') },
+  { week: 25, phase: 5, targetKm: 44, longKm: 12, q1: interval(6, 400, '5K', 90, '5K 配速唤醒'), q2: interval(2, 1000, 'T', 90, '阈值维持') },
+  { week: 26, phase: 5, targetKm: 36, longKm: 0, raceWeek: true, raceTargetSec: 17 * 60, q1: interval(4, 400, '5K', 90, '赛前唤醒'), q2: interval(3, 200, 'R', 90, '赛前速度感觉') },
 ]
 
 export function phaseForWeek(week: number): Phase {
@@ -233,9 +235,9 @@ function workoutDetails(
 }
 
 interface EasyAllocation {
-  wed: number
-  thu: number
-  sat: number
+  mediumLong: number
+  easy: number
+  recovery: number
   long: number
 }
 
@@ -253,22 +255,22 @@ function allocateEasyKm(
     remaining += shrink
   }
   remaining = Math.max(remaining, 9)
-  let wed = round(remaining * 0.4, 1)
-  let thu = round(remaining * 0.4, 1)
-  let sat = round(remaining - wed - thu, 1)
-  if (sat < 3) {
-    const need = 3 - sat
-    sat = 3
-    wed = Math.max(3, wed - need / 2)
-    thu = Math.max(3, thu - need / 2)
+  let mediumLong = round(remaining * 0.45, 1)
+  let easy = round(remaining * 0.35, 1)
+  let recovery = round(remaining - mediumLong - easy, 1)
+  if (recovery < 3) {
+    const need = 3 - recovery
+    recovery = 3
+    mediumLong = Math.max(3, mediumLong - need / 2)
+    easy = Math.max(3, easy - need / 2)
   }
-  wed = Math.max(3, wed)
-  thu = Math.max(3, thu)
-  sat = Math.max(3, sat)
-  const sum = wed + thu + sat
+  mediumLong = Math.max(3, mediumLong)
+  easy = Math.max(3, easy)
+  recovery = Math.max(3, recovery)
+  const sum = mediumLong + easy + recovery
   const diff = round(remaining - sum, 1)
-  wed = Math.max(3, round(wed + diff, 1))
-  return { wed, thu, sat, long }
+  mediumLong = Math.max(3, round(mediumLong + diff, 1))
+  return { mediumLong, easy, recovery, long }
 }
 
 function simpleSession(
@@ -308,28 +310,56 @@ export interface GenerateWeekOptions {
  * concrete paces are computed from the VDOT passed in.
  */
 export function generatePlanWeek(opts: GenerateWeekOptions): Plan {
-  const { weekIndex, weekStart, vdot } = opts
+  const { weekIndex, weekStart, vdot, profile } = opts
   const bp = WEEK_BLUEPRINTS.find((w) => w.week === weekIndex) ?? WEEK_BLUEPRINTS[25]
   const phase = (opts.phaseOverride as Phase | undefined) ?? bp.phase
   const targetKm = opts.targetKmOverride ?? bp.targetKm
   const sessions: PlannedSession[] = []
 
-  const day = (offset: number) => addDaysIso(weekStart, offset)
+  const restDay = profile.restDay ?? 7
+  const qualityDays = profile.qualityDays?.length >= 2 ? profile.qualityDays : [2, 4]
+  const longDay = profile.longRunDay ?? 6
+  const q1Day = qualityDays[0]
+  const q2Day = qualityDays[1]
+  const dayDate = (dayNumber: number) => addDaysIso(weekStart, dayNumber - 1)
+  const weekday = (dayNumber: number) => formatWeekday(dayDate(dayNumber))
+  const easyDays = [1, 2, 3, 4, 5, 6, 7].filter(
+    (d) => d !== restDay && !qualityDays.includes(d) && d !== longDay,
+  )
+  const mediumLongDay =
+    easyDays.find((d) => d > q1Day) ?? easyDays.find((d) => d !== restDay) ?? 3
+  const stridesDay =
+    easyDays.find((d) => d !== mediumLongDay && d < longDay) ??
+    easyDays.find((d) => d !== mediumLongDay) ??
+    5
+  const recoveryDay =
+    easyDays.find((d) => d !== mediumLongDay && d !== stridesDay) ?? 1
+  const easyPace = practicalEasyPace(vdot)
 
-  // Monday rest
   sessions.push(
-    simpleSession(day(0), 'rest', '完全休息', '不跑；可做 10 min 拉伸/泡沫轴，睡眠优先。', {
-      purpose: '恢复与适应',
-      targetPace: null,
-      durationMin: 0,
-    }),
+    simpleSession(
+      dayDate(restDay),
+      'rest',
+      '完全休息',
+      '不跑；可做 10 min 拉伸/泡沫轴，睡眠优先。',
+      {
+        purpose: '恢复与适应',
+        targetPace: null,
+        durationMin: 0,
+      },
+    ),
   )
 
   if (bp.raceWeek) {
-    // Race week is special: quality Tue/Thu, easy Fri, race Sunday.
     const q1 = workoutDetails(bp.q1, vdot)
+    const q2 = workoutDetails(bp.q2, vdot)
+    const q1Km = totalKmForWorkout(bp.q1, vdot)
+    const q2Km = totalKmForWorkout(bp.q2, vdot)
+    const raceKm = 9
+    const alloc = allocateEasyKm(targetKm, q1Km, q2Km + raceKm, 0)
+
     sessions.push(
-      simpleSession(day(1), 'repetition', q1.title, q1.details, {
+      simpleSession(dayDate(q1Day), 'repetition', q1.title, q1.details, {
         zone: bp.q1.zone,
         distanceM: q1.distanceM,
         targetPace: q1.targetPace,
@@ -338,16 +368,15 @@ export function generatePlanWeek(opts: GenerateWeekOptions): Plan {
       }),
     )
     sessions.push(
-      simpleSession(day(2), 'easy', '轻松跑 5 km', `轻松跑 @ ${formatPaceRange(practicalEasyPace(vdot).fastSecKm, practicalEasyPace(vdot).slowSecKm)}/km。`, {
-        distanceM: 5000,
+      simpleSession(dayDate(mediumLongDay), 'easy', `轻松跑 ${alloc.mediumLong.toFixed(1)} km`, `轻松跑 ${alloc.mediumLong.toFixed(1)} km @ ${formatPaceRange(easyPace.fastSecKm, easyPace.slowSecKm)}/km。`, {
+        distanceM: Math.round(alloc.mediumLong * 1000),
         zone: 'E',
-        targetPace: practicalEasyPace(vdot),
+        targetPace: easyPace,
         purpose: EASY_PURPOSE,
       }),
     )
-    const q2 = workoutDetails(bp.q2, vdot)
     sessions.push(
-      simpleSession(day(3), 'repetition', q2.title, q2.details, {
+      simpleSession(dayDate(q2Day), 'repetition', q2.title, q2.details, {
         zone: bp.q2.zone,
         distanceM: q2.distanceM,
         targetPace: q2.targetPace,
@@ -356,33 +385,35 @@ export function generatePlanWeek(opts: GenerateWeekOptions): Plan {
       }),
     )
     sessions.push(
-      simpleSession(day(4), 'easy', '赛前轻松跑', '20 min 轻松跑 + 3×60 m 加速跑，不练到累。', {
-        distanceM: 4000,
+      simpleSession(dayDate(stridesDay), 'easy', '赛前轻松跑', '20 min 轻松跑 + 3×60 m 加速跑，不练到累。', {
+        distanceM: Math.round(alloc.easy * 1000),
         zone: 'E',
-        targetPace: practicalEasyPace(vdot),
+        targetPace: easyPace,
         purpose: '赛前唤醒',
       }),
     )
     sessions.push(
-      simpleSession(day(5), 'rest', '赛前休息', '完全休息；准备好比赛装备与补给。', {
-        purpose: '为 5 km 计时赛蓄力',
-        targetPace: null,
-        durationMin: 0,
+      simpleSession(dayDate(recoveryDay), 'easy', '赛前恢复跑', '20–30 min 轻松跑，或完全休息。', {
+        distanceM: Math.round(alloc.recovery * 1000),
+        zone: 'E',
+        targetPace: easyPace,
+        purpose: '为比赛蓄力',
       }),
     )
+    const raceTarget = bp.raceTargetSec ?? 17 * 60
+    const racePace = raceTarget / 5
     sessions.push(
-      simpleSession(day(6), 'time_trial', '5 km 计时赛', '按 W20 的 5 km 配速执行；前 1 km 保守 2–3 s/400 m，最后 1 km 提速。', {
+      simpleSession(dayDate(longDay), 'time_trial', '5 km 计时赛', '按 W20 的 5 km 配速执行；前 1 km 保守 2–3 s/400 m，最后 1 km 提速。', {
         distanceM: 9000,
         testDistanceM: 5000,
         zone: '5K',
-        targetTimeSec: 17 * 60 + 50,
-        targetPace: { fastSecKm: (17 * 60 + 50) / 5, slowSecKm: (17 * 60 + 50) / 5 },
+        targetTimeSec: raceTarget,
+        targetPace: { fastSecKm: racePace, slowSecKm: racePace },
         purpose: '6 个月最终测试；sub-17 为 stretch',
         downgrade: '状态红：改 3 km 轻松节奏，不硬测',
       }),
     )
   } else {
-    // Normal week: Tue Q1, Wed easy + strength, Thu easy + strides, Fri Q2, Sat recovery, Sun long.
     const testWeek = bp.q2.kind === 'test'
     const q1 = workoutDetails(bp.q1, vdot)
     const q2 = workoutDetails(bp.q2, vdot)
@@ -391,48 +422,59 @@ export function generatePlanWeek(opts: GenerateWeekOptions): Plan {
     const alloc = allocateEasyKm(targetKm, q1Km, q2Km, bp.longKm)
 
     sessions.push(
-      simpleSession(day(1), testWeek ? 'easy' : bp.q1.zone === 'R' ? 'repetition' : bp.q1.zone === 'T' ? 'threshold' : 'interval', q1.title, q1.details, {
-        zone: bp.q1.zone,
-        distanceM: q1.distanceM,
-        targetPace: q1.targetPace,
-        purpose: testWeek ? `${EASY_PURPOSE}；为周五计时赛蓄力` : bp.q1.purpose,
-        downgrade: testWeek ? '不安排质量课；只做轻松跑 + 加速跑' : '状态黄：减 1–2 组；红：30 min 轻松跑 + 4×20 s',
-      }),
+      simpleSession(
+        dayDate(q1Day),
+        testWeek ? 'easy' : bp.q1.zone === 'R' ? 'repetition' : bp.q1.zone === 'T' ? 'threshold' : 'interval',
+        q1.title,
+        q1.details,
+        {
+          zone: bp.q1.zone,
+          distanceM: q1.distanceM,
+          targetPace: q1.targetPace,
+          purpose: testWeek ? `${EASY_PURPOSE}；为计时赛蓄力` : bp.q1.purpose,
+          downgrade: testWeek ? '不安排质量课；只做轻松跑 + 加速跑' : '状态黄：减 1–2 组；红：30 min 轻松跑 + 4×20 s',
+        },
+      ),
     )
 
-    const easyPace = practicalEasyPace(vdot)
     sessions.push(
-      simpleSession(day(2), 'easy', `轻松跑 ${alloc.wed.toFixed(1)} km + 力量`, `轻松跑 ${alloc.wed.toFixed(1)} km @ ${formatPaceRange(easyPace.fastSecKm, easyPace.slowSecKm)}/km；随后力量 30 min（深蹲、髋铰链、单腿、提踵、核心）。`, {
-        distanceM: Math.round(alloc.wed * 1000),
+      simpleSession(dayDate(mediumLongDay), 'easy', `中长跑 ${alloc.mediumLong.toFixed(1)} km + 力量 A`, `中长跑 ${alloc.mediumLong.toFixed(1)} km @ ${formatPaceRange(easyPace.fastSecKm, easyPace.slowSecKm)}/km；随后力量 A 30 min（深蹲、髋铰链、单腿、提踵）。`, {
+        distanceM: Math.round(alloc.mediumLong * 1000),
         zone: 'E',
         targetPace: easyPace,
-        purpose: '有氧恢复 + 力量维持',
+        purpose: '有氧容量 + 力量维持',
       }),
     )
     sessions.push(
-      simpleSession(day(3), 'easy', `轻松跑 ${alloc.thu.toFixed(1)} km + 加速跑`, `轻松跑 ${alloc.thu.toFixed(1)} km @ ${formatPaceRange(easyPace.fastSecKm, easyPace.slowSecKm)}/km；结束后 6×20 s 加速跑。`, {
-        distanceM: Math.round(alloc.thu * 1000),
+      simpleSession(dayDate(stridesDay), 'easy', `轻松跑 ${alloc.easy.toFixed(1)} km + 加速跑`, `轻松跑 ${alloc.easy.toFixed(1)} km @ ${formatPaceRange(easyPace.fastSecKm, easyPace.slowSecKm)}/km；结束后 6×20 s 加速跑 + 核心 B 15 min。`, {
+        distanceM: Math.round(alloc.easy * 1000),
         zone: 'E',
         targetPace: easyPace,
-        purpose: STRIDES_PURPOSE,
+        purpose: `${STRIDES_PURPOSE}；核心/髋稳定`,
       }),
     )
 
     sessions.push(
-      simpleSession(day(4), testWeek ? 'time_trial' : bp.q2.zone === 'T' ? 'threshold' : 'interval', q2.title, q2.details, {
-        zone: bp.q2.zone,
-        distanceM: q2.distanceM,
-        testDistanceM: q2.testDistanceM,
-        targetPace: q2.targetPace,
-        targetTimeSec: q2.targetTimeSec,
-        purpose: bp.q2.purpose,
-        downgrade: testWeek ? '状态黄：改 3 km 节奏跑；红：改轻松跑' : '状态黄：减 1 组；红：30 min 轻松跑 + 4×20 s',
-      }),
+      simpleSession(
+        dayDate(q2Day),
+        testWeek ? 'time_trial' : bp.q2.zone === 'T' ? 'threshold' : 'interval',
+        q2.title,
+        q2.details,
+        {
+          zone: bp.q2.zone,
+          distanceM: q2.distanceM,
+          testDistanceM: q2.testDistanceM,
+          targetPace: q2.targetPace,
+          targetTimeSec: q2.targetTimeSec,
+          purpose: bp.q2.purpose,
+          downgrade: testWeek ? '状态黄：改 3 km 节奏跑；红：改轻松跑' : '状态黄：减 1 组；红：30 min 轻松跑 + 4×20 s',
+        },
+      ),
     )
 
     sessions.push(
-      simpleSession(day(5), 'easy', `恢复跑 ${alloc.sat.toFixed(1)} km`, `恢复跑 ${alloc.sat.toFixed(1)} km @ ${formatPaceRange(easyPace.fastSecKm, easyPace.slowSecKm)}/km，或完全休息。`, {
-        distanceM: Math.round(alloc.sat * 1000),
+      simpleSession(dayDate(recoveryDay), 'easy', `恢复跑 ${alloc.recovery.toFixed(1)} km`, `恢复跑 ${alloc.recovery.toFixed(1)} km @ ${formatPaceRange(easyPace.fastSecKm, easyPace.slowSecKm)}/km，或完全休息。`, {
+        distanceM: Math.round(alloc.recovery * 1000),
         zone: 'E',
         targetPace: easyPace,
         purpose: '恢复',
@@ -440,7 +482,7 @@ export function generatePlanWeek(opts: GenerateWeekOptions): Plan {
     )
 
     sessions.push(
-      simpleSession(day(6), 'long', `长距离 ${alloc.long.toFixed(0)} km`, `长距离 ${alloc.long.toFixed(0)} km @ ${formatPaceRange(easyPace.fastSecKm, easyPace.slowSecKm)}/km，保持可对话。${bp.longNote ? `；${bp.longNote}` : ''}`, {
+      simpleSession(dayDate(longDay), 'long', `长距离 ${alloc.long.toFixed(0)} km`, `长距离 ${alloc.long.toFixed(0)} km @ ${formatPaceRange(easyPace.fastSecKm, easyPace.slowSecKm)}/km，保持可对话。${bp.longNote ? `；${bp.longNote}` : ''}`, {
         distanceM: Math.round(alloc.long * 1000),
         zone: 'E',
         targetPace: easyPace,
@@ -449,9 +491,11 @@ export function generatePlanWeek(opts: GenerateWeekOptions): Plan {
     )
   }
 
+  sessions.sort((a, b) => a.date.localeCompare(b.date))
+
   const rationale =
     opts.rationale ??
-    `第 ${weekIndex} 周（${phaseName(phase)}）：目标 ${targetKm} km，周二/周五质量课，周日长距离；${
+    `第 ${weekIndex} 周（${phaseName(phase)}）：目标 ${targetKm} km；${weekday(q1Day)}、${weekday(q2Day)} 质量课，${weekday(longDay)} 长距离，${weekday(restDay)} 休息；${
       bp.down ? '本周为减量周。' : '质量课之外全部轻松跑。'
     }`
 

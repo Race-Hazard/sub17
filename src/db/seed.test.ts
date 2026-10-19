@@ -32,6 +32,9 @@ describe('seed and repository', () => {
     const profile = defaultProfile('2026-10-17')
     expect(profile.startDate).toBe('2026-10-19')
     expect(profile.goalDate).toBe('2027-04-18')
+    expect(profile.qualityDays).toEqual([2, 4])
+    expect(profile.longRunDay).toBe(6)
+    expect(profile.restDay).toBe(7)
     // Monday/Tuesday onboarding joins the current week; Wednesday waits.
     expect(defaultProfile('2026-10-17', '2026-10-20').startDate).toBe('2026-10-19')
     expect(defaultProfile('2026-10-17', '2026-10-21').startDate).toBe('2026-10-26')

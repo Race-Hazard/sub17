@@ -17,7 +17,7 @@ import {
 import { phaseName, weeklyTargetKm, WEEK_BLUEPRINTS } from '../domain/plan'
 import type { Checkin, IsoDate, Plan, PlannedSession, Profile, Session } from '../domain/types'
 import type { TrainingStatus } from '../domain/status'
-import { ensurePlanForWeek } from '../db/repo'
+import { ensurePlanForWeek, regeneratePlanWeek } from '../db/repo'
 
 export function PlanPage({
   profile,
@@ -68,6 +68,21 @@ export function PlanPage({
       `第 ${nextWeekIndex} 周：${adjustment.rationale}`,
     )
     setMessage(`${plan.weekStart} 周已生成：目标 ${plan.targetKm} km。${adjustment.rationale}`)
+    setGenerating(false)
+  }
+
+  const regenerateCurrent = async () => {
+    if (!activePlan) return
+    if (
+      !window.confirm(
+        '重新生成本周会替换未完成的计划课表，不会删除已有训练记录。继续？',
+      )
+    ) {
+      return
+    }
+    setGenerating(true)
+    const updated = await regeneratePlanWeek(activePlan, status.currentVdot, profile)
+    setMessage(`本周已重新生成：目标 ${updated.targetKm} km。`)
     setGenerating(false)
   }
 
@@ -160,9 +175,19 @@ export function PlanPage({
               {nextPlan ? `${formatShortDate(nextPlan.weekStart)} 起 · ${nextPlan.targetKm} km` : `W${nextWeekIndex} · 目标 ${weeklyTargetKm(nextWeekIndex)} km`}
             </div>
           </div>
-          <Button size="sm" onClick={generateNext} disabled={generating || activePlan.weekIndex >= 26 || !!nextPlan}>
-            <RefreshCw size={14} /> {nextPlan ? '已生成' : generating ? '生成中…' : '生成下周'}
-          </Button>
+          <div className="flex flex-wrap justify-end gap-1.5">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => void regenerateCurrent()}
+              disabled={generating}
+            >
+              重新生成本周
+            </Button>
+            <Button size="sm" onClick={generateNext} disabled={generating || activePlan.weekIndex >= 26 || !!nextPlan}>
+              <RefreshCw size={14} /> {nextPlan ? '已生成' : generating ? '生成中…' : '生成下周'}
+            </Button>
+          </div>
         </div>
         <p className="text-[11px] leading-relaxed text-muted">
           依据最近完成度、准备度、ACWR 与睡眠债调整；周中只做安全降级，不重写已生成的课表。
