@@ -1,6 +1,8 @@
 # Sub17 — 项目上下文（新会话请先读）
 
-关键词：**sub17** / **破17** / **Sub17 训练 App**
+关键词：**sub17** / **破17** / **继续sub17** / **Sub17 训练 App**
+
+> 新会话只要输入上述任一关键词，先读本文件、`README.md` 和 `git log --oneline -5`，再按「待办 / 用户侧」继续。
 
 ## 这是什么
 
@@ -26,7 +28,8 @@
   - 使用只授权该仓库的 fine-grained token（Contents: Read and write）；token 只在 App 本机 localStorage，**不要写入仓库或聊天**
 - Git remote 已改为 SSH：`git@github.com:Race-Hazard/sub17.git`
 - `git push` 后 GitHub Actions 自动测试、构建、部署 Pages；不需要手动上传 dist
-- 最新提交：目标优先计划（周日休息、周六长距离、68–72 km/周）+ 实际训练重排 + PWA 更新提示 + 质量课评估 + 身体数据/午睡 + 评估卡片 UI
+- 最新提交：`de48b7f`（身体数据/午睡 + 质量评估卡片 UI；之前：目标优先计划、实际训练重排、PWA 更新提示、质量评估、自动写入下次计划）
+- 最新部署：`de48b7f` GitHub Actions **success**（Pages 已更新）
 - 之前：`ba0fef7`（阈值分组 + 按时间模式）、`30a7ac0`（私有 GitHub 同步）
 
 ## 常用命令
@@ -87,7 +90,8 @@ vite.config.ts  base=/sub17/；vite-plugin-pwa；Vitest 配置
 
 ## 待办 / 用户侧
 
-- 用户在 Android 上没有 Chrome，准备改用 Edge 安装 PWA
-- 用户已生成 fine-grained token，待装 Edge 后在设置页配置同步
-- 配置后验证：手机加记录 → 电脑「立即同步」→ 记录出现；反向再试
-- 不要在聊天里索要 token；让用户在 App 里填
+- **手机**：Android 无 Chrome，用 Edge 安装 PWA；若已安装，先手动更新到 `de48b7f`（旧 Service Worker 缓存），之后走「重启更新」提示条。
+- **云同步**：若尚未配置，创建私有 `sub17-data` + fine-grained token（Contents: Read and write），在设置页填 `Race-Hazard / sub17-data / sub17.json / main / token`；不要索要或粘贴 token。
+- **验收**：身体页记身高/体重 → 睡眠页填午睡 → 记一次质量课看今日页评估卡 → 计划页看「已写入计划」的组数/时长 → 两端「立即同步」互查。
+- **可选下一步**：今日/状态页加身体摘要；质量评估历史筛选；FIT/OCR；后台通知。
+- 当前代码工作区干净，`main` 与 `origin/main` 同步；74 个测试通过。
