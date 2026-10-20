@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { CalendarCheck, RefreshCw } from 'lucide-react'
 import { Button, Card, EmptyState, Pill, ProgressBar, SectionTitle } from '../components/ui'
+import { AdviceBox } from '../components/QualityCard'
 import {
   adjustNextWeek,
   complianceForPlan,
@@ -165,12 +166,7 @@ export function PlanPage({
       ) : null}
 
       {status.quality.last ? (
-        <Card className="space-y-1.5">
-          <div className="text-xs font-semibold text-slate-200">下次同类质量课建议</div>
-          <div className="text-[11px] leading-relaxed text-slate-300">
-            {status.quality.last.nextAdvice}
-          </div>
-        </Card>
+        <AdviceBox text={status.quality.last.nextAdvice} />
       ) : null}
 
       <SectionTitle>本周课表</SectionTitle>

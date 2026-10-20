@@ -1,4 +1,5 @@
 import type {
+  BodyMetric,
   Checkin,
   MetaRow,
   Plan,
@@ -134,6 +135,7 @@ export function parseSyncPayload(value: unknown): SyncData {
     sessions: readArray<Session>('sessions'),
     checkins: readArray<Checkin>('checkins'),
     sleep: readArray<SleepRecord>('sleep'),
+    body: Array.isArray(raw.body) ? (raw.body as BodyMetric[]) : [],
     plans: readArray<Plan>('plans'),
     meta: readArray<MetaRow>('meta'),
     tombstones: Array.isArray(raw.tombstones) ? (raw.tombstones as Tombstone[]) : [],

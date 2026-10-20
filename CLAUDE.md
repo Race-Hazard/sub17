@@ -26,7 +26,7 @@
   - 使用只授权该仓库的 fine-grained token（Contents: Read and write）；token 只在 App 本机 localStorage，**不要写入仓库或聊天**
 - Git remote 已改为 SSH：`git@github.com:Race-Hazard/sub17.git`
 - `git push` 后 GitHub Actions 自动测试、构建、部署 Pages；不需要手动上传 dist
-- 最新提交：目标优先计划（周日休息、周六长距离、68–72 km/周）+ 实际训练重排 + PWA 更新提示 + 质量课评估
+- 最新提交：目标优先计划（周日休息、周六长距离、68–72 km/周）+ 实际训练重排 + PWA 更新提示 + 质量课评估 + 身体数据/午睡 + 评估卡片 UI
 - 之前：`ba0fef7`（阈值分组 + 按时间模式）、`30a7ac0`（私有 GitHub 同步）
 
 ## 常用命令
@@ -34,7 +34,7 @@
 ```bash
 cd /home/hazard/sub17
 npm run dev        # http://localhost:5173/
-npm test           # Vitest，当前 72 个测试
+npm test           # Vitest，当前 74 个测试
 npm run build      # 产出 dist/（base=/sub17/）
 npm run preview    # http://localhost:4173/sub17/
 node scripts/screenshot.mjs   # 需 npx playwright install chromium
@@ -49,10 +49,10 @@ git add . && git commit -m "..." && git push
 src/domain/     纯函数：VDOT(vdot.ts)、计划(plan.ts)、负荷(load.ts)、
                 睡眠(sleep.ts)、准备度(readiness.ts)、教练规则(coach.ts)、
                 状态(status.ts)、圈计时(lapTimer.ts)、GPX(gpx.ts)、.ics(notify.ts)
-src/db/         Dexie schema/repo/seed/backup（schema v2，含 tombstones）
+src/db/         Dexie schema/repo/seed/backup（schema v3，含 tombstones + body）
 src/sync/       GitHub Contents API、merge、自动同步引擎
-src/pages/      Onboarding/Today/Log/Plan/Status/Sleep/Settings
-src/components/ UI、LapTimer、ReadinessBadge、BottomNav
+src/pages/      Onboarding/Today/Log/Plan/Status/Sleep/Body/Settings
+src/components/ UI、LapTimer、ReadinessBadge、BottomNav、QualityCard、UpdatePrompt
 vite.config.ts  base=/sub17/；vite-plugin-pwa；Vitest 配置
 .github/workflows/deploy.yml  GitHub Pages Actions
 ```
@@ -63,7 +63,8 @@ vite.config.ts  base=/sub17/；vite-plugin-pwa；Vitest 配置
 - 间歇/重复/阈值分组共用构建器：按距离 / 按时间；阈值可选连续/分组（默认 3×2 km）
 - 按时间模式：距离留空用当前 I/R/T 中间配速估算，也可填实际距离
 - 400 m 圈计时：暂停不计时、完成自动补最后一段、刷新恢复、Wake Lock
-- 睡眠：上床/起床或总时长、7 天图、睡眠债、规律性
+- 睡眠：上床/起床或总时长、**午睡分钟**、7 天图、睡眠债（夜间+午睡）、规律性
+- 身体：身高/体重/体脂/腰围、7 天均重、4 周变化、30 天趋势；建议体重 2–3 次/周、身高一次、体脂/腰围 2–4 周一次
 - 计划：26 周、检查点 W4/8/12/16/20/26、按完成度/准备度/ACWR/睡眠/检查点调整
 - 状态：VDOT/5 km 等价/配速/ACWR/里程碑/周报
 - 同步：打开+保存后自动 pull+merge+push；按记录合并；tombstone 传播删除；设置页可手动同步/从云端覆盖

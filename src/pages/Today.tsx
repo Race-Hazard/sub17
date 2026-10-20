@@ -8,6 +8,7 @@ import {
   Timer,
 } from 'lucide-react'
 import { LapTimer, type LapTimerResult } from '../components/LapTimer'
+import { QualityCard } from '../components/QualityCard'
 import { ReadinessBadge } from '../components/ReadinessBadge'
 import { Button, Card, Pill, SectionTitle, Stat } from '../components/ui'
 import { saveCheckin, saveSession } from '../db/repo'
@@ -22,7 +23,6 @@ import {
   secondsPerKm,
   uid,
 } from '../domain/format'
-import { qualityKindLabel } from '../domain/quality'
 import type { TrainingStatus } from '../domain/status'
 import type {
   Checkin,
@@ -164,10 +164,14 @@ export function Today({
         <Stat
           label="准备度"
           value={status.readiness.level === 'green' ? '绿' : status.readiness.level === 'yellow' ? '黄' : '红'}
-          hint={`睡眠 ${status.sleep.averageMin != null ? (status.sleep.averageMin / 60).toFixed(1) + ' h' : '—'}`}
+          hint={`睡眠 ${status.sleep.totalAverageMin != null ? (status.sleep.totalAverageMin / 60).toFixed(1) + ' h' : '—'}`}
           tone={status.readiness.level === 'green' ? 'good' : status.readiness.level === 'yellow' ? 'warn' : 'bad'}
         />
       </div>
+
+      {status.quality.last && status.quality.last.date === today ? (
+        <QualityCard evaluation={status.quality.last} />
+      ) : null}
 
       <SectionTitle>今日课表</SectionTitle>
       {planned ? (
@@ -215,38 +219,6 @@ export function Today({
           <Button variant="secondary" size="sm" onClick={onPlan}>查看计划</Button>
         </Card>
       )}
-
-      {status.quality.last && status.quality.last.date === today ? (
-        <Card className="space-y-2">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <div className="text-sm font-semibold text-slate-200">
-                本次质量课评估 · {qualityKindLabel(status.quality.last.kind)}
-              </div>
-              <div className="mt-0.5 text-[11px] text-muted">
-                {status.quality.last.summary}
-              </div>
-            </div>
-            <Pill
-              tone={
-                status.quality.last.verdict === 'excellent' ||
-                status.quality.last.verdict === 'onTarget'
-                  ? 'good'
-                  : status.quality.last.verdict === 'fade'
-                    ? 'warn'
-                    : status.quality.last.verdict === 'fast'
-                      ? 'sky'
-                      : 'bad'
-              }
-            >
-              {status.quality.last.verdictLabel}
-            </Pill>
-          </div>
-          <div className="rounded-lg border border-accent-2/20 bg-accent-2/5 px-2.5 py-2 text-xs leading-relaxed text-slate-300">
-            下次同类课建议：{status.quality.last.nextAdvice}
-          </div>
-        </Card>
-      ) : null}
 
       <SectionTitle>快速记录</SectionTitle>
       <div className="grid grid-cols-2 gap-2">

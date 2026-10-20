@@ -1,4 +1,5 @@
 import type {
+  BodyMetric,
   Checkin,
   MetaRow,
   Plan,
@@ -13,6 +14,7 @@ export interface SyncData {
   sessions: Session[]
   checkins: Checkin[]
   sleep: SleepRecord[]
+  body: BodyMetric[]
   plans: Plan[]
   meta: MetaRow[]
   tombstones: Tombstone[]
@@ -24,6 +26,7 @@ export function emptySyncData(): SyncData {
     sessions: [],
     checkins: [],
     sleep: [],
+    body: [],
     plans: [],
     meta: [],
     tombstones: [],
@@ -147,6 +150,16 @@ export function mergeSyncData(local: SyncData, remote: SyncData): SyncData {
     return !deletedAt || deletedAt < c.updatedAt
   })
 
+  const body = mergeByKey(
+    local.body,
+    remote.body,
+    (b) => b.date,
+    (b) => b.updatedAt,
+  ).filter((b) => {
+    const deletedAt = tombstoneAt.get(`body:${b.date}`)
+    return !deletedAt || deletedAt < b.updatedAt
+  })
+
   return {
     profile: mergeByKey(
       local.profile,
@@ -157,6 +170,7 @@ export function mergeSyncData(local: SyncData, remote: SyncData): SyncData {
     sessions,
     checkins,
     sleep,
+    body,
     plans: mergePlans(local.plans, remote.plans),
     meta: mergeMeta(local.meta, remote.meta),
     tombstones,

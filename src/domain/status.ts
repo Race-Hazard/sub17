@@ -100,7 +100,9 @@ export function computeStatus(input: StatusInput): TrainingStatus {
   )
 
   const readiness = evaluateReadiness({
-    sleepMin: todaySleep?.durationMin ?? null,
+    sleepMin: todaySleep
+      ? todaySleep.durationMin + (todaySleep.napMin ?? 0)
+      : null,
     painScore: todayCheckin?.painScore ?? null,
     rpeDrift: drift,
     load,

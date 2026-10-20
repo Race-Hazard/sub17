@@ -1,5 +1,6 @@
 import { formatPace, nowIso, secondsPerKm, todayIso } from '../domain/format'
 import type {
+  BodyMetric,
   Checkin,
   MetaRow,
   Plan,
@@ -23,18 +24,20 @@ export interface BackupPayload {
   sessions: Session[]
   checkins: Checkin[]
   sleep: SleepRecord[]
+  body: BodyMetric[]
   plans: Plan[]
   meta: MetaRow[]
   tombstones: Tombstone[]
 }
 
 export async function exportBackup(): Promise<BackupPayload> {
-  const [profile, sessions, checkins, sleep, plans, meta, tombstones] =
+  const [profile, sessions, checkins, sleep, body, plans, meta, tombstones] =
     await Promise.all([
       db.profile.toArray(),
       db.sessions.toArray(),
       db.checkins.toArray(),
       db.sleep.toArray(),
+      db.body.toArray(),
       db.plans.toArray(),
       db.meta.toArray(),
       db.tombstones.toArray(),
@@ -49,6 +52,7 @@ export async function exportBackup(): Promise<BackupPayload> {
       sessions: sessions.length,
       checkins: checkins.length,
       sleep: sleep.length,
+      body: body.length,
       plans: plans.length,
       meta: meta.length,
       tombstones: tombstones.length,
@@ -57,6 +61,7 @@ export async function exportBackup(): Promise<BackupPayload> {
     sessions,
     checkins,
     sleep,
+    body,
     plans,
     meta,
     tombstones,
@@ -78,9 +83,16 @@ export function validateBackup(value: unknown): { ok: true; payload: BackupPaylo
   if (v.tombstones != null && !Array.isArray(v.tombstones)) {
     return { ok: false, error: '备份里的 tombstones 不是数组' }
   }
+  if (v.body != null && !Array.isArray(v.body)) {
+    return { ok: false, error: '备份里的 body 不是数组' }
+  }
   return {
     ok: true,
-    payload: { ...(v as BackupPayload), tombstones: v.tombstones ?? [] },
+    payload: {
+      ...(v as BackupPayload),
+      body: v.body ?? [],
+      tombstones: v.tombstones ?? [],
+    },
   }
 }
 
@@ -88,12 +100,13 @@ export function validateBackup(value: unknown): { ok: true; payload: BackupPaylo
 export async function importBackup(payload: BackupPayload): Promise<void> {
   await db.transaction(
     'rw',
-    [db.sessions, db.checkins, db.sleep, db.plans, db.profile, db.meta, db.tombstones],
+    [db.sessions, db.checkins, db.sleep, db.body, db.plans, db.profile, db.meta, db.tombstones],
     async () => {
       await Promise.all([
         db.sessions.clear(),
         db.checkins.clear(),
         db.sleep.clear(),
+        db.body.clear(),
         db.plans.clear(),
         db.profile.clear(),
         db.meta.clear(),
@@ -103,6 +116,7 @@ export async function importBackup(payload: BackupPayload): Promise<void> {
       await db.sessions.bulkPut(payload.sessions)
       await db.checkins.bulkPut(payload.checkins)
       await db.sleep.bulkPut(payload.sleep)
+      await db.body.bulkPut(payload.body ?? [])
       await db.plans.bulkPut(payload.plans)
       await db.meta.bulkPut(payload.meta)
       await db.tombstones.bulkPut(payload.tombstones ?? [])

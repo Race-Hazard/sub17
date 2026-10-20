@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Bar,
   BarChart,
@@ -37,13 +37,43 @@ export function SleepPage({
   const [bedtime, setBedtime] = useState('23:00')
   const [wakeTime, setWakeTime] = useState('07:00')
   const [hours, setHours] = useState('7.5')
+  const [napMin, setNapMin] = useState('0')
   const [quality, setQuality] = useState(3)
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
 
+  useEffect(() => {
+    const record = sleeps.find((s) => s.date === date)
+    if (!record) {
+      setMode('times')
+      setBedtime('23:00')
+      setWakeTime('07:00')
+      setHours('7.5')
+      setNapMin('0')
+      setQuality(3)
+      setNotes('')
+      return
+    }
+    if (record.bedtime && record.wakeTime) {
+      setMode('times')
+      setBedtime(record.bedtime)
+      setWakeTime(record.wakeTime)
+    } else {
+      setMode('duration')
+      setHours((record.durationMin / 60).toFixed(1))
+    }
+    setNapMin(String(record.napMin ?? 0))
+    setQuality(record.quality ?? 3)
+    setNotes(record.notes ?? '')
+    // Re-prefill only when the selected date changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date])
+
   const durationMin = mode === 'times'
     ? durationBetween(bedtime, wakeTime) ?? 0
     : Math.round((Number(hours) || 0) * 60)
+  const napMinutes = Math.max(0, Math.min(240, Math.round(Number(napMin) || 0)))
+  const totalMin = durationMin + napMinutes
 
   const summary = useMemo(
     () => sleepSummary(sleeps, profile.sleepTargetMin, today, 7),
@@ -56,13 +86,15 @@ export function SleepPage({
       const rec = sleeps.find((s) => s.date === d)
       return {
         date: formatWeekday(d),
-        hours: rec ? Number((rec.durationMin / 60).toFixed(1)) : 0,
+        nightHours: rec ? Number((rec.durationMin / 60).toFixed(1)) : 0,
+        napHours: rec ? Number(((rec.napMin ?? 0) / 60).toFixed(1)) : 0,
         has: rec != null,
       }
     })
   }, [sleeps, today])
 
-  const invalidDuration = durationMin <= 0 || durationMin > 16 * 60
+  const invalidDuration =
+    durationMin < 0 || durationMin > 16 * 60 || totalMin <= 0
 
   const save = async () => {
     if (invalidDuration) return
@@ -72,6 +104,7 @@ export function SleepPage({
       bedtime: mode === 'times' ? bedtime : undefined,
       wakeTime: mode === 'times' ? wakeTime : undefined,
       durationMin,
+      napMin: napMinutes,
       quality,
       notes: notes.trim() || undefined,
       updatedAt: nowIso(),
@@ -95,9 +128,9 @@ export function SleepPage({
         <h1 className="mt-0.5 text-2xl font-bold text-slate-50">睡眠</h1>
       </header>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <Stat
-          label="7 天平均"
+          label="夜间平均"
           value={summary.averageMin != null ? `${(summary.averageMin / 60).toFixed(1)} h` : '—'}
           hint={summary.nights ? `${summary.nights} 晚` : '还没记录'}
           tone={
@@ -109,9 +142,14 @@ export function SleepPage({
           }
         />
         <Stat
-          label="睡眠债"
-          value={summary.debtMin != null ? `${(summary.debtMin / 60).toFixed(1)} h` : '—'}
-          hint={`目标 ${(profile.sleepTargetMin / 60).toFixed(1)} h`}
+          label="午睡平均"
+          value={summary.napAverageMin != null ? `${(summary.napAverageMin / 60).toFixed(1)} h` : '—'}
+          hint={summary.napAverageMin ? '白天补觉' : '没有午睡记录'}
+        />
+        <Stat
+          label="总睡眠"
+          value={summary.totalAverageMin != null ? `${(summary.totalAverageMin / 60).toFixed(1)} h` : '—'}
+          hint={`目标 ${(profile.sleepTargetMin / 60).toFixed(1)} h · 债 ${summary.debtMin != null ? (summary.debtMin / 60).toFixed(1) : '—'} h`}
           tone={
             summary.debtMin == null
               ? 'default'
@@ -125,7 +163,7 @@ export function SleepPage({
         <Stat
           label="作息规律"
           value={summary.midpointStdMin != null ? `±${summary.midpointStdMin} min` : '—'}
-          hint="中点标准差"
+          hint="夜间中点标准差"
         />
       </div>
 
@@ -137,10 +175,11 @@ export function SleepPage({
             <YAxis domain={[0, 10]} tick={{ fill: '#8fa0b8', fontSize: 10 }} axisLine={false} tickLine={false} />
             <Tooltip
               contentStyle={{ background: '#121a2b', border: '1px solid #25324a', borderRadius: 12, fontSize: 12 }}
-              formatter={(value) => [`${value} h`, '睡眠']}
+              formatter={(value, name) => [`${value} h`, name]}
             />
             <ReferenceLine y={profile.sleepTargetMin / 60} stroke="#c7f464" strokeDasharray="4 4" />
-            <Bar dataKey="hours" fill="#38bdf8" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="nightHours" name="夜间" stackId="sleep" fill="#38bdf8" />
+            <Bar dataKey="napHours" name="午睡" stackId="sleep" fill="#c7f464" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </Card>
@@ -197,11 +236,25 @@ export function SleepPage({
           </label>
         )}
         <div className="flex items-center justify-between rounded-xl border border-line/70 bg-surface-2/40 px-3 py-2 text-sm">
-          <span className="text-muted">计算时长</span>
+          <span className="text-muted">夜间时长</span>
           <span className="tabular text-slate-100">{formatSleepMinutes(durationMin)}</span>
         </div>
+        <label className="block text-xs text-muted">
+          午睡（分钟，可选）
+          <input
+            value={napMin}
+            onChange={(e) => setNapMin(e.target.value)}
+            inputMode="numeric"
+            placeholder="0"
+            className="mt-1 w-full rounded-xl border border-line bg-ink/60 px-3 py-2.5 text-base text-slate-100 outline-none focus:border-accent"
+          />
+        </label>
+        <div className="flex items-center justify-between rounded-xl border border-accent-2/20 bg-accent-2/5 px-3 py-2 text-sm">
+          <span className="text-muted">含午睡合计</span>
+          <span className="tabular text-slate-100">{formatSleepMinutes(totalMin)}</span>
+        </div>
         {invalidDuration ? (
-          <div className="text-[11px] text-bad">请检查上床/起床时间（时长应在 0–16 h）。</div>
+          <div className="text-[11px] text-bad">请检查夜间时长（0–16 h）或午睡（0–240 min），合计至少 1 分钟。</div>
         ) : null}
         <label className="block text-xs text-muted">
           睡眠质量 <span className="text-slate-300">{quality}/5</span>
@@ -240,6 +293,8 @@ export function SleepPage({
                 <div className="text-[11px] text-muted">
                   {r.bedtime && r.wakeTime ? `${r.bedtime}–${r.wakeTime} · ` : ''}
                   {formatSleepMinutes(r.durationMin)}
+                  {r.napMin ? ` + 午睡 ${formatSleepMinutes(r.napMin)}` : ''}
+                  {r.napMin ? ` · 合计 ${formatSleepMinutes(r.durationMin + r.napMin)}` : ''}
                   {r.quality ? ` · 质量 ${r.quality}/5` : ''}
                 </div>
               </div>
@@ -252,7 +307,7 @@ export function SleepPage({
       )}
 
       <div className="pb-2 text-center text-[10px] text-muted">
-        <Pill tone="neutral">睡眠债按已记录夜晚计算，缺失夜晚不臆测</Pill>
+        <Pill tone="neutral">睡眠债按已记录夜晚计算，含午睡；缺失夜晚不臆测</Pill>
       </div>
     </div>
   )

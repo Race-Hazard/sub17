@@ -9,6 +9,7 @@ import { Log } from './pages/Log'
 import { PlanPage } from './pages/PlanPage'
 import { StatusPage } from './pages/StatusPage'
 import { SleepPage } from './pages/SleepPage'
+import { BodyPage } from './pages/BodyPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { db } from './db/schema'
 import { ensureSeed } from './db/seed'
@@ -27,13 +28,21 @@ import { adjustNextWeek, latestCheckpointVerdict } from './domain/coach'
 import { initSync, setupSyncListeners } from './sync/engine'
 import { bestCurrentVdot } from './domain/projection'
 import { computeStatus } from './domain/status'
-import type { Checkin, Plan, Profile, Session, SleepRecord } from './domain/types'
+import type {
+  BodyMetric,
+  Checkin,
+  Plan,
+  Profile,
+  Session,
+  SleepRecord,
+} from './domain/types'
 import { vdotFromPerformance } from './domain/vdot'
 
 const EMPTY_SESSIONS: Session[] = []
 const EMPTY_SLEEPS: SleepRecord[] = []
 const EMPTY_CHECKINS: Checkin[] = []
 const EMPTY_PLANS: Plan[] = []
+const EMPTY_BODY: BodyMetric[] = []
 
 function vdotNow(sessions: Session[], profile: Profile, today: string): number {
   const tests = sessions
@@ -74,6 +83,7 @@ export default function App() {
   const sleeps = useLiveQuery(() => db.sleep.toArray(), []) ?? EMPTY_SLEEPS
   const checkins = useLiveQuery(() => db.checkins.toArray(), []) ?? EMPTY_CHECKINS
   const plans = useLiveQuery(() => db.plans.toArray(), []) ?? EMPTY_PLANS
+  const bodyMetrics = useLiveQuery(() => db.body.toArray(), []) ?? EMPTY_BODY
   const onboardedMeta = useLiveQuery(() => db.meta.get('onboarded'), [])
 
   useEffect(() => {
@@ -328,6 +338,14 @@ export default function App() {
             profile={profile}
             today={today}
             onSaved={() => setTab('today')}
+          />
+        )
+      case 'body':
+        return (
+          <BodyPage
+            metrics={bodyMetrics}
+            today={today}
+            onSaved={() => undefined}
           />
         )
       case 'settings':

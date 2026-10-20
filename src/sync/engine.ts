@@ -22,29 +22,31 @@ export interface SyncResult {
 }
 
 export async function collectSyncData(): Promise<SyncData> {
-  const [profile, sessions, checkins, sleep, plans, meta, tombstones] =
+  const [profile, sessions, checkins, sleep, body, plans, meta, tombstones] =
     await Promise.all([
       db.profile.toArray(),
       db.sessions.toArray(),
       db.checkins.toArray(),
       db.sleep.toArray(),
+      db.body.toArray(),
       db.plans.toArray(),
       db.meta.toArray(),
       db.tombstones.toArray(),
     ])
-  return { profile, sessions, checkins, sleep, plans, meta, tombstones }
+  return { profile, sessions, checkins, sleep, body, plans, meta, tombstones }
 }
 
 export async function applySyncData(data: SyncData): Promise<void> {
   await db.transaction(
     'rw',
-    [db.profile, db.sessions, db.checkins, db.sleep, db.plans, db.meta, db.tombstones],
+    [db.profile, db.sessions, db.checkins, db.sleep, db.body, db.plans, db.meta, db.tombstones],
     async () => {
       await Promise.all([
         db.profile.clear(),
         db.sessions.clear(),
         db.checkins.clear(),
         db.sleep.clear(),
+        db.body.clear(),
         db.plans.clear(),
         db.meta.clear(),
         db.tombstones.clear(),
@@ -53,6 +55,7 @@ export async function applySyncData(data: SyncData): Promise<void> {
       await db.sessions.bulkPut(data.sessions)
       await db.checkins.bulkPut(data.checkins)
       await db.sleep.bulkPut(data.sleep)
+      await db.body.bulkPut(data.body)
       await db.plans.bulkPut(data.plans)
       await db.meta.bulkPut(data.meta)
       await db.tombstones.bulkPut(data.tombstones)
@@ -64,6 +67,7 @@ function latestUpdate(data: SyncData): string {
   const times = [
     ...data.sessions.map((s) => s.updatedAt),
     ...data.sleep.map((s) => s.updatedAt),
+    ...data.body.map((b) => b.updatedAt),
     ...data.checkins.map((s) => s.updatedAt),
     ...data.profile.map((p) => p.updatedAt),
     ...data.plans.map((p) => p.createdAt),

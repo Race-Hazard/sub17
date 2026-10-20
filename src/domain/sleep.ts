@@ -46,7 +46,10 @@ export function sleepDebt(
   const inRange = records.filter((r) => r.date >= start && r.date <= endDate)
   if (inRange.length === 0) return { debtMin: null, nights: 0, averageMin: null }
   const total = inRange.reduce((sum, r) => sum + r.durationMin, 0)
-  const debt = inRange.reduce((sum, r) => sum + (targetMin - r.durationMin), 0)
+  const debt = inRange.reduce(
+    (sum, r) => sum + (targetMin - r.durationMin - (r.napMin ?? 0)),
+    0,
+  )
   return {
     debtMin: Math.round(debt),
     nights: inRange.length,
@@ -72,10 +75,23 @@ export function sleepSummary(
   const start = addDaysIso(endDate, -(days - 1))
   const inRange = records.filter((r) => r.date >= start && r.date <= endDate)
   if (inRange.length === 0) {
-    return { averageMin: null, debtMin: null, midpointStdMin: null, nights: 0 }
+    return {
+      averageMin: null,
+      napAverageMin: null,
+      totalAverageMin: null,
+      debtMin: null,
+      midpointStdMin: null,
+      nights: 0,
+    }
   }
   const average = inRange.reduce((s, r) => s + r.durationMin, 0) / inRange.length
-  const debt = inRange.reduce((s, r) => s + (targetMin - r.durationMin), 0)
+  const napAverage =
+    inRange.reduce((s, r) => s + (r.napMin ?? 0), 0) / inRange.length
+  const totalAverage = average + napAverage
+  const debt = inRange.reduce(
+    (s, r) => s + (targetMin - r.durationMin - (r.napMin ?? 0)),
+    0,
+  )
   const midpoints = inRange
     .map(midpointSinceNoon)
     .filter((m): m is number => m != null)
@@ -88,6 +104,8 @@ export function sleepSummary(
   }
   return {
     averageMin: Math.round(average),
+    napAverageMin: Math.round(napAverage),
+    totalAverageMin: Math.round(totalAverage),
     debtMin: Math.round(debt),
     midpointStdMin: sd != null ? Math.round(sd) : null,
     nights: inRange.length,

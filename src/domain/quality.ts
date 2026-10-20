@@ -117,9 +117,7 @@ function findPlanned(
   const byId = all.find((p) => p.id === session.plannedSessionId)
   if (byId) return byId
   return all.find(
-    (p) =>
-      p.date === session.date &&
-      (p.type === session.type || QUALITY_TYPES.includes(p.type)),
+    (p) => p.date === session.date && p.type === session.type,
   )
 }
 
@@ -275,10 +273,10 @@ function adviceFor(
   const recovery = continuous
     ? '连续完成，不设组间恢复'
     : kind === 'T'
-      ? '组间 60–90 s'
+      ? '组间 60–90 秒'
       : kind === 'R'
-        ? '充分恢复 2–3 min'
-        : '组间 2–3 min 慢跑'
+        ? '充分恢复 2–3 分钟'
+        : '组间 2–3 分钟慢跑'
 
   let volume = `${repCount}×${repText}`
   if (kind === 'TEST') {
@@ -292,8 +290,8 @@ function adviceFor(
     const delta = nextWorkout.continuousMinDelta ?? 0
     volume =
       delta === 0
-        ? `保持计划时长（本次 ${continuousMin ?? '—'} min）`
-        : `计划基础上 ${delta > 0 ? '+' : ''}${delta} min（本次 ${continuousMin ?? '—'} min）`
+        ? `保持计划时长（本次 ${continuousMin ?? '—'} 分钟）`
+        : `计划基础上 ${delta > 0 ? '+' : ''}${delta} 分钟（本次 ${continuousMin ?? '—'} 分钟）`
   } else if (nextWorkout) {
     const delta = nextWorkout.repsDelta ?? 0
     volume =
@@ -304,14 +302,14 @@ function adviceFor(
 
   const cue = continuous
     ? verdict === 'excellent' || verdict === 'onTarget'
-      ? '可以加 5 min，但不要同时提速。'
+      ? '可以加 5 分钟，但不要同时提速。'
       : verdict === 'overload' || verdict === 'slow'
-        ? '下次减 5 min，先稳住目标配速；必要时重测 VDOT。'
+        ? '下次减 5 分钟，先稳住目标配速；必要时重测 VDOT。'
         : verdict === 'fast'
           ? '保持同量，不要继续加速；安排一次 5 km 计时赛校准 VDOT。'
           : '保持同量，先稳住节奏。'
     : verdict === 'excellent'
-      ? '可以加组或缩短 15 s 恢复，但不要同时加量又提速。'
+      ? '可以加组或缩短 15 秒恢复，但不要同时加量又提速。'
       : verdict === 'onTarget'
         ? '保持同样结构，最后 1–2 组再提速。'
         : verdict === 'fade'

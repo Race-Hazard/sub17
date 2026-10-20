@@ -1,5 +1,6 @@
 import Dexie, { type Table } from 'dexie'
 import type {
+  BodyMetric,
   Checkin,
   MetaRow,
   Plan,
@@ -9,7 +10,7 @@ import type {
   Tombstone,
 } from '../domain/types'
 
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 
 export class Sub17DB extends Dexie {
   sessions!: Table<Session, string>
@@ -19,6 +20,7 @@ export class Sub17DB extends Dexie {
   profile!: Table<Profile, string>
   meta!: Table<MetaRow, string>
   tombstones!: Table<Tombstone, string>
+  body!: Table<BodyMetric, string>
 
   constructor(name = 'sub17') {
     super(name)
@@ -38,6 +40,16 @@ export class Sub17DB extends Dexie {
       profile: 'id',
       meta: 'key',
       tombstones: 'key, kind, at',
+    })
+    this.version(3).stores({
+      sessions: 'id, date, type, plannedSessionId, isTest',
+      checkins: 'date, status',
+      sleep: 'date',
+      plans: 'id, &weekStart, weekIndex, status',
+      profile: 'id',
+      meta: 'key',
+      tombstones: 'key, kind, at',
+      body: 'date, updatedAt',
     })
   }
 }

@@ -22,6 +22,18 @@ describe('sleep', () => {
     expect(summary.debtMin).toBe(90)
   })
 
+  it('includes naps in total sleep and debt', () => {
+    const records: SleepRecord[] = [
+      { date: '2026-10-16', durationMin: 420, napMin: 30, updatedAt: '' },
+      { date: '2026-10-17', durationMin: 390, napMin: 20, updatedAt: '' },
+    ]
+    const summary = sleepSummary(records, 450, '2026-10-17', 7)
+    expect(summary.averageMin).toBe(405)
+    expect(summary.napAverageMin).toBe(25)
+    expect(summary.totalAverageMin).toBe(430)
+    expect(summary.debtMin).toBe(40)
+  })
+
   it('returns null instead of inventing missing nights at launch', () => {
     const debt = sleepDebt([], 450, '2026-10-17', 7)
     expect(debt.nights).toBe(0)

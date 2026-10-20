@@ -189,7 +189,7 @@ function workoutDetails(
     const pace = practicalEasyPace(vdot)
     return {
       title: '轻松跑',
-      details: `轻松跑 @ ${formatPaceRange(pace.fastSecKm, pace.slowSecKm)}/km，保持可对话；结束后 6×20 s 加速跑。`,
+      details: `轻松跑 @ ${formatPaceRange(pace.fastSecKm, pace.slowSecKm)}/km，保持可对话；结束后 6×20秒加速跑。`,
       distanceM: 5000,
       targetPace: pace,
     }
@@ -201,7 +201,7 @@ function workoutDetails(
     const pace = targetTimeSec > 0 ? (targetTimeSec / distanceM) * 1000 : null
     return {
       title: `${formatKm(distanceM)} 计时赛`,
-      details: `热身 2–3 km + 3×60 m 加速跑，休息 5–10 min；${formatKm(distanceM)} 全力计时，记录每 400 m 分段；前 400 m 保守 2–3 s；结束后 2 km 放松。`,
+      details: `热身 2–3 km + 3×60 m 加速跑，休息 5–10 分钟；${formatKm(distanceM)} 全力计时，记录每 400 m 分段；前 400 m 保守 2–3 秒；结束后 2 km 放松。`,
       distanceM: distanceM + 4000,
       testDistanceM: distanceM,
       targetPace: pace ? { fastSecKm: pace, slowSecKm: pace } : null,
@@ -214,8 +214,8 @@ function workoutDetails(
     const mainKm = workoutMainKm(bp, vdot)
     const min = bp.continuousMin ?? 20
     return {
-      title: `${min} min 阈值跑`,
-      details: `热身 2 km；${min} min 连续 @ ${formatPaceRange(pace?.fastSecKm, pace?.slowSecKm)}/km；放松 2 km。`,
+      title: `${min} 分钟阈值跑`,
+      details: `热身 2 km；${min} 分钟连续 @ ${formatPaceRange(pace?.fastSecKm, pace?.slowSecKm)}/km；放松 2 km。`,
       distanceM: Math.round((mainKm + 4) * 1000),
       durationMin: Math.round((mainKm * ((pace!.fastSecKm + pace!.slowSecKm) / 2)) / 60 + 16),
       targetPace: pace,
@@ -230,7 +230,7 @@ function workoutDetails(
   const extra = bp.extra ? `；${bp.extra}` : ''
   return {
     title: `${reps} × ${formatKm(repM)} ${bp.zone ?? ''}`,
-    details: `热身 2 km；${reps} × ${formatKm(repM)} @ ${formatPaceRange(pace?.fastSecKm, pace?.slowSecKm)}/km（每组 ${formatDuration(repSecFast)}–${formatDuration(repSecSlow)}），组间 ${bp.recoverySec ?? 90} s 慢跑${extra}；放松 2 km。`,
+    details: `热身 2 km；${reps} × ${formatKm(repM)} @ ${formatPaceRange(pace?.fastSecKm, pace?.slowSecKm)}/km（每组 ${formatDuration(repSecFast)}–${formatDuration(repSecSlow)}），组间 ${bp.recoverySec ?? 90} 秒慢跑${extra}；放松 2 km。`,
     distanceM: Math.round((mainKm + 4) * 1000),
     targetPace: pace,
   }
@@ -430,7 +430,7 @@ export function generatePlanWeek(opts: GenerateWeekOptions): Plan {
       dayDate(restDay),
       'rest',
       '完全休息',
-      '不跑；可做 10 min 拉伸/泡沫轴，睡眠优先。',
+      '不跑；可做 10 分钟拉伸/泡沫轴，睡眠优先。',
       {
         purpose: '恢复与适应',
         targetPace: null,
@@ -454,7 +454,7 @@ export function generatePlanWeek(opts: GenerateWeekOptions): Plan {
         targetPace: q1.targetPace,
         workout: workoutWithAdvice(q1Bp, opts.qualityAdvice),
         purpose: q1Bp.purpose,
-        downgrade: '状态黄：减到 3 组；红：改 20 min 轻松跑',
+        downgrade: '状态黄：减到 3 组；红：改 20 分钟轻松跑',
       }),
     )
     sessions.push(
@@ -472,11 +472,11 @@ export function generatePlanWeek(opts: GenerateWeekOptions): Plan {
         targetPace: q2.targetPace,
         workout: workoutWithAdvice(q2Bp, opts.qualityAdvice),
         purpose: q2Bp.purpose,
-        downgrade: '状态黄：减到 2 组；红：只做 20 min 轻松跑',
+        downgrade: '状态黄：减到 2 组；红：只做 20 分钟轻松跑',
       }),
     )
     sessions.push(
-      simpleSession(dayDate(stridesDay), 'easy', '赛前轻松跑', '20 min 轻松跑 + 3×60 m 加速跑，不练到累。', {
+      simpleSession(dayDate(stridesDay), 'easy', '赛前轻松跑', '20 分钟轻松跑 + 3×60 m 加速跑，不练到累。', {
         distanceM: Math.round(alloc.easy * 1000),
         zone: 'E',
         targetPace: easyPace,
@@ -484,7 +484,7 @@ export function generatePlanWeek(opts: GenerateWeekOptions): Plan {
       }),
     )
     sessions.push(
-      simpleSession(dayDate(recoveryDay), 'easy', '赛前恢复跑', '20–30 min 轻松跑，或完全休息。', {
+      simpleSession(dayDate(recoveryDay), 'easy', '赛前恢复跑', '20–30 分钟轻松跑，或完全休息。', {
         distanceM: Math.round(alloc.recovery * 1000),
         zone: 'E',
         targetPace: easyPace,
@@ -494,7 +494,7 @@ export function generatePlanWeek(opts: GenerateWeekOptions): Plan {
     const raceTarget = bp.raceTargetSec ?? 17 * 60
     const racePace = raceTarget / 5
     sessions.push(
-      simpleSession(dayDate(longDay), 'time_trial', '5 km 计时赛', '按 W20 的 5 km 配速执行；前 1 km 保守 2–3 s/400 m，最后 1 km 提速。', {
+      simpleSession(dayDate(longDay), 'time_trial', '5 km 计时赛', '按 W20 的 5 km 配速执行；前 1 km 保守 2–3 秒/400 m，最后 1 km 提速。', {
         distanceM: 9000,
         testDistanceM: 5000,
         zone: '5K',
@@ -526,7 +526,7 @@ export function generatePlanWeek(opts: GenerateWeekOptions): Plan {
           targetPace: q1.targetPace,
           workout: workoutWithAdvice(q1Bp, opts.qualityAdvice),
           purpose: testWeek ? `${EASY_PURPOSE}；核心 B` : `${q1Bp.purpose}；力量 A`,
-          downgrade: testWeek ? '不安排质量课；只做轻松跑 + 加速跑' : '状态黄：减 1–2 组；红：30 min 轻松跑 + 4×20 s',
+          downgrade: testWeek ? '不安排质量课；只做轻松跑 + 加速跑' : '状态黄：减 1–2 组；红：30 分钟轻松跑 + 4×20秒',
         },
       ),
     )
@@ -540,7 +540,7 @@ export function generatePlanWeek(opts: GenerateWeekOptions): Plan {
       }),
     )
     sessions.push(
-      simpleSession(dayDate(stridesDay), 'easy', `轻松跑 ${alloc.easy.toFixed(1)} km + 加速跑`, `轻松跑 ${alloc.easy.toFixed(1)} km @ ${formatPaceRange(easyPace.fastSecKm, easyPace.slowSecKm)}/km；结束后 6×20 s 加速跑；可选 10 min 核心。`, {
+      simpleSession(dayDate(stridesDay), 'easy', `轻松跑 ${alloc.easy.toFixed(1)} km + 加速跑`, `轻松跑 ${alloc.easy.toFixed(1)} km @ ${formatPaceRange(easyPace.fastSecKm, easyPace.slowSecKm)}/km；结束后 6×20秒加速跑；可选 10 分钟核心。`, {
         distanceM: Math.round(alloc.easy * 1000),
         zone: 'E',
         targetPace: easyPace,
@@ -564,13 +564,13 @@ export function generatePlanWeek(opts: GenerateWeekOptions): Plan {
           targetTimeSec: q2.targetTimeSec,
           workout: workoutWithAdvice(q2Bp, opts.qualityAdvice),
           purpose: testWeek ? q2Bp.purpose : `${q2Bp.purpose}；核心 B`,
-          downgrade: testWeek ? '状态黄：改 3 km 节奏跑；红：改轻松跑' : '状态黄：减 1 组；红：30 min 轻松跑 + 4×20 s',
+          downgrade: testWeek ? '状态黄：改 3 km 节奏跑；红：改轻松跑' : '状态黄：减 1 组；红：30 分钟轻松跑 + 4×20秒',
         },
       ),
     )
 
     sessions.push(
-      simpleSession(dayDate(recoveryDay), 'easy', `恢复跑 ${alloc.recovery.toFixed(1)} km`, `恢复跑 ${alloc.recovery.toFixed(1)} km @ ${formatPaceRange(easyPace.fastSecKm, easyPace.slowSecKm)}/km，或完全休息；可选 10 min 核心（平板/死虫）。`, {
+      simpleSession(dayDate(recoveryDay), 'easy', `恢复跑 ${alloc.recovery.toFixed(1)} km`, `恢复跑 ${alloc.recovery.toFixed(1)} km @ ${formatPaceRange(easyPace.fastSecKm, easyPace.slowSecKm)}/km，或完全休息；可选 10 分钟核心（平板/死虫）。`, {
         distanceM: Math.round(alloc.recovery * 1000),
         zone: 'E',
         targetPace: easyPace,

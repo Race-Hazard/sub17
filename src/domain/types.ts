@@ -84,7 +84,19 @@ export interface SleepRecord {
   bedtime?: string // HH:mm
   wakeTime?: string // HH:mm
   durationMin: number
+  /** Daytime nap, minutes. */
+  napMin?: number
   quality?: number // 1-5
+  notes?: string
+  updatedAt: string
+}
+
+export interface BodyMetric {
+  date: IsoDate
+  heightCm?: number
+  weightKg?: number
+  bodyFatPct?: number
+  waistCm?: number
   notes?: string
   updatedAt: string
 }
@@ -183,7 +195,7 @@ export interface MetaRow {
 /** Soft-delete marker so a deletion propagates instead of being resurrected. */
 export interface Tombstone {
   key: string
-  kind: 'session' | 'sleep' | 'checkin'
+  kind: 'session' | 'sleep' | 'checkin' | 'body'
   at: string
 }
 
@@ -211,6 +223,8 @@ export interface Readiness {
 
 export interface SleepSummary {
   averageMin: number | null
+  napAverageMin: number | null
+  totalAverageMin: number | null
   debtMin: number | null
   midpointStdMin: number | null
   nights: number

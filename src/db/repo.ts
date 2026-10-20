@@ -2,6 +2,7 @@ import { addDaysIso, mondayOf, nowIso, uid } from '../domain/format'
 import { generatePlanWeek } from '../domain/plan'
 import type { NextQualityWorkout, QualityKind } from '../domain/quality'
 import type {
+  BodyMetric,
   Checkin,
   IsoDate,
   MetaRow,
@@ -103,6 +104,30 @@ export async function saveSleep(record: SleepRecord): Promise<void> {
 
 export async function listSleep(): Promise<SleepRecord[]> {
   return db.sleep.orderBy('date').toArray()
+}
+
+export async function listBody(): Promise<BodyMetric[]> {
+  return db.body.orderBy('date').toArray()
+}
+
+export async function saveBody(metric: BodyMetric): Promise<void> {
+  await db.transaction('rw', [db.body, db.tombstones], async () => {
+    await db.tombstones.delete(`body:${metric.date}`)
+    await db.body.put({ ...metric, updatedAt: nowIso() })
+  })
+  markDirty()
+}
+
+export async function deleteBody(date: IsoDate): Promise<void> {
+  await db.transaction('rw', [db.body, db.tombstones], async () => {
+    await db.tombstones.put({
+      key: `body:${date}`,
+      kind: 'body',
+      at: nowIso(),
+    })
+    await db.body.delete(date)
+  })
+  markDirty()
 }
 
 export async function deleteSleep(date: IsoDate): Promise<void> {

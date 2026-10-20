@@ -145,12 +145,26 @@ describe('quality session evaluation', () => {
       50,
     )
     expect(evaluation?.reps).toBe(1)
-    expect(evaluation?.nextAdvice).toContain('+5 min')
+    expect(evaluation?.nextAdvice).toContain('+5 分钟')
     expect(evaluation?.nextWorkout).toEqual({
       kind: 'T',
       mode: 'continuous',
       continuousMinDelta: 5,
     })
+  })
+
+  it('does not borrow an interval target for a threshold session on the same day', () => {
+    const threshold = {
+      ...qualitySession([253], 8000, 4, 'threshold'),
+      plannedSessionId: undefined,
+    }
+    const summary = qualitySummary(
+      [threshold],
+      [planWith(planned('p1', 'interval', 'I', 9000, targetI))],
+      50,
+    )
+    expect(summary.last?.kind).toBe('T')
+    expect(summary.last?.targetPace?.fastSecKm).toBeGreaterThan(240)
   })
 
   it('summarizes the latest evaluation and latest per kind', () => {

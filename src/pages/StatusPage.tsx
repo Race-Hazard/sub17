@@ -20,6 +20,7 @@ import {
 } from '../domain/format'
 import { checkpointAction, checkpointVerdict } from '../domain/coach'
 import { qualityKindLabel } from '../domain/quality'
+import { QualityCard } from '../components/QualityCard'
 import { downgradeGoal, GOAL_TIERS, MILESTONES } from '../domain/projection'
 import { saveProfile } from '../db/repo'
 import type { TrainingStatus } from '../domain/status'
@@ -88,8 +89,8 @@ export function StatusPage({
     status.compliance
       ? `完成 ${status.compliance.completed}/${status.compliance.planned}（质量课 ${status.compliance.qualityCompleted}/${status.compliance.qualityPlanned}）`
       : '本周计划尚未生成',
-    status.sleep.averageMin != null
-      ? `睡眠平均 ${(status.sleep.averageMin / 60).toFixed(1)} h，债 ${((status.sleep.debtMin ?? 0) / 60).toFixed(1)} h`
+    status.sleep.totalAverageMin != null
+      ? `总睡眠平均 ${(status.sleep.totalAverageMin / 60).toFixed(1)} h（含午睡），债 ${((status.sleep.debtMin ?? 0) / 60).toFixed(1)} h`
       : '睡眠未记录',
     `准备度 ${status.readiness.level === 'green' ? '绿' : status.readiness.level === 'yellow' ? '黄' : '红'}；ACWR ${status.load.acwr != null ? status.load.acwr.toFixed(2) : '数据不足'}`,
     `当前 5K 等价 ${formatDuration(status.current5kSec)}；目标置信度 ${status.goal.label}`,
@@ -176,9 +177,9 @@ export function StatusPage({
         />
         <Stat
           label="睡眠 7 天"
-          value={status.sleep.averageMin != null ? `${(status.sleep.averageMin / 60).toFixed(1)} h` : '—'}
-          hint={status.sleep.debtMin != null ? `睡眠债 ${(status.sleep.debtMin / 60).toFixed(1)} h` : '记录后显示'}
-          tone={status.sleep.averageMin != null && status.sleep.averageMin < 7 * 60 ? 'warn' : 'default'}
+          value={status.sleep.totalAverageMin != null ? `${(status.sleep.totalAverageMin / 60).toFixed(1)} h` : '—'}
+          hint={status.sleep.debtMin != null ? `含午睡 · 债 ${(status.sleep.debtMin / 60).toFixed(1)} h` : '记录后显示'}
+          tone={status.sleep.totalAverageMin != null && status.sleep.totalAverageMin < 7 * 60 ? 'warn' : 'default'}
         />
       </div>
 
@@ -201,57 +202,51 @@ export function StatusPage({
       </Card>
 
       <SectionTitle>质量课评估</SectionTitle>
-      <Card className="space-y-2">
-        {status.quality.last ? (
-          <>
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="text-sm font-medium text-slate-200">
-                  {qualityKindLabel(status.quality.last.kind)} · {formatShortDate(status.quality.last.date)}
-                </div>
-                <div className="mt-0.5 text-[11px] leading-relaxed text-muted">
-                  {status.quality.last.summary}
-                </div>
-              </div>
-              <Pill
-                tone={
-                  status.quality.last.verdict === 'excellent' ||
-                  status.quality.last.verdict === 'onTarget'
-                    ? 'good'
-                    : status.quality.last.verdict === 'fade'
-                      ? 'warn'
-                      : status.quality.last.verdict === 'fast'
-                        ? 'sky'
-                        : 'bad'
-                }
-              >
-                {status.quality.last.verdictLabel}
-              </Pill>
-            </div>
-            <div className="rounded-lg border border-accent-2/20 bg-accent-2/5 px-2.5 py-2 text-xs leading-relaxed text-slate-300">
-              下次同类课建议：{status.quality.last.nextAdvice}
-            </div>
-            {status.quality.history.length > 1 ? (
-              <div className="space-y-1 border-t border-line/70 pt-2">
-                {status.quality.history.slice(1, 4).map((evaluation) => (
-                  <div key={evaluation.sessionId} className="flex items-center justify-between text-[11px]">
-                    <span className="text-muted">
-                      {formatShortDate(evaluation.date)} · {qualityKindLabel(evaluation.kind)}
+      {status.quality.last ? (
+        <div className="space-y-2">
+          <QualityCard evaluation={status.quality.last} />
+          {status.quality.history.length > 1 ? (
+            <Card className="space-y-1.5">
+              <div className="text-[11px] font-semibold text-slate-300">最近几次</div>
+              {status.quality.history.slice(1, 4).map((evaluation) => (
+                <div
+                  key={evaluation.sessionId}
+                  className="flex min-w-0 items-center justify-between gap-2 text-[11px]"
+                >
+                  <span className="min-w-0 truncate text-muted">
+                    {formatShortDate(evaluation.date)} · {qualityKindLabel(evaluation.kind)}
+                  </span>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <span className="tabular text-slate-300">
+                      {formatPace(evaluation.avgPaceSecKm)}/km
                     </span>
-                    <span className="text-slate-300">
-                      {evaluation.verdictLabel} · {formatPace(evaluation.avgPaceSecKm)}/km
-                    </span>
+                    <Pill
+                      tone={
+                        evaluation.verdict === 'excellent' ||
+                        evaluation.verdict === 'onTarget'
+                          ? 'good'
+                          : evaluation.verdict === 'fade'
+                            ? 'warn'
+                            : evaluation.verdict === 'fast'
+                              ? 'sky'
+                              : 'bad'
+                      }
+                    >
+                      {evaluation.verdictLabel}
+                    </Pill>
                   </div>
-                ))}
-              </div>
-            ) : null}
-          </>
-        ) : (
-          <div className="text-xs text-muted">
+                </div>
+              ))}
+            </Card>
+          ) : null}
+        </div>
+      ) : (
+        <Card>
+          <div className="text-xs leading-relaxed text-muted">
             还没有质量课评估。记录一次间歇/阈值/重复后，这里会自动生成评价和下次建议。
           </div>
-        )}
-      </Card>
+        </Card>
+      )}
 
       <SectionTitle>VDOT 趋势</SectionTitle>
       <Card>
