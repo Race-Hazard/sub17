@@ -161,7 +161,7 @@ export function PlanPage({
       setScheduleMessage(
         `已安排 ${formatShortDate(testDate)} ${formatWeekday(testDate)}：${formatKm(
           testDistanceM,
-        )} 计时赛；当天课表已替换，前后 48 小时强度课已降级。`,
+        )} 计时赛；当天课表已替换，前后 2–3 天强度课已降级。`,
       )
     } catch (error) {
       setScheduleError(error instanceof Error ? error.message : '安排测试日失败')
@@ -202,7 +202,7 @@ export function PlanPage({
             <Timer size={15} /> 测试日 · 计时赛
           </div>
           <div className="mt-1 text-[11px] leading-relaxed text-muted">
-            临时指定本周或未来几周的某天做测试。当天课表替换为计时赛，前后 48 小时的质量课和长距离自动降为轻松跑；自动重排不会改掉测试日。
+            临时指定本周或未来几周的某天做测试。当天课表替换为计时赛，前后 2 天的质量课、3 天内的长距离自动降为轻松跑；自动重排不会改掉测试日。
           </div>
         </div>
         <Button

@@ -281,8 +281,8 @@ export function applyTestDayToPlan(input: ApplyTestDayInput): {
     changed = true
     const reason =
       offset < 0
-        ? `测试日 ${formatShortDate(testDay.date)} 前 ${Math.abs(offset)} 天，强度课降为轻松跑`
-        : `测试日 ${formatShortDate(testDay.date)} 后 ${offset} 天，强度课降为轻松跑`
+        ? `测试日 ${formatShortDate(testDay.date)} 前 ${Math.abs(offset)} 天，强度课/长距离降为轻松跑`
+        : `测试日 ${formatShortDate(testDay.date)} 后 ${offset} 天，强度课/长距离降为轻松跑`
     reasons.push(reason)
     changes.push({
       plannedSessionId: session.id,
@@ -300,7 +300,7 @@ export function applyTestDayToPlan(input: ApplyTestDayInput): {
     ? plan.rationale
     : `${plan.rationale.replace(/[。；;]\s*$/, '')}；${marker}：${formatKm(
         testDay.distanceM,
-      )} 计时赛，前后 48 小时强度课已降级。`
+      )} 计时赛，前后 2–3 天强度课已降级。`
 
   return {
     plan: {
