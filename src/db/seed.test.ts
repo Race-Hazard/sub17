@@ -73,22 +73,38 @@ describe('seed and repository', () => {
     expect((await getActivePlan())?.status).toBe('active')
   })
 
-  it('round-trips a backup with full replacement', async () => {
+  it('round-trips a backup with full replacement, including test days', async () => {
     await ensureSeed(TODAY)
+    await db.testDays.put({
+      date: '2026-10-24',
+      distanceM: 5000,
+      createdAt: '2026-10-18T00:00:00.000Z',
+      updatedAt: '2026-10-18T00:00:00.000Z',
+    })
     const payload = await exportBackup()
     expect(payload.counts.sessions).toBe(10)
+    expect(payload.counts.testDays).toBe(1)
     expect(validateBackup(payload).ok).toBe(true)
 
     await db.sessions.clear()
+    await db.testDays.clear()
     expect(await listSessions()).toHaveLength(0)
     await importBackup(payload)
     expect(await listSessions()).toHaveLength(10)
+    expect(await db.testDays.toArray()).toHaveLength(1)
   })
 
   it('clears training data without deleting the profile or reseeding', async () => {
     await ensureSeed(TODAY)
+    await db.testDays.put({
+      date: '2026-10-24',
+      distanceM: 5000,
+      createdAt: '2026-10-18T00:00:00.000Z',
+      updatedAt: '2026-10-18T00:00:00.000Z',
+    })
     await clearTrainingData()
     expect(await listSessions()).toHaveLength(0)
+    expect(await db.testDays.toArray()).toHaveLength(0)
     expect(await getProfile()).toBeDefined()
     await ensureSeed(TODAY)
     expect(await listSessions()).toHaveLength(0)

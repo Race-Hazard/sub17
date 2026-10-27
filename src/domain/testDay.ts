@@ -2,6 +2,7 @@ import {
   addDaysIso,
   daysBetween,
   formatKm,
+  formatPaceRange,
   formatShortDate,
   nowIso,
   uid,
@@ -121,11 +122,10 @@ function asEasy(
     testDistanceM: undefined,
     workout: undefined,
     title,
-    details: `${details} 轻松跑 ${formatKm(distanceM)} @ ${Math.floor(pace.fastSecKm / 60)}:${String(
-      Math.round(pace.fastSecKm % 60),
-    ).padStart(2, '0')}–${Math.floor(pace.slowSecKm / 60)}:${String(
-      Math.round(pace.slowSecKm % 60),
-    ).padStart(2, '0')}/km，保持可对话。`,
+    details: `${details} 轻松跑 ${formatKm(distanceM)} @ ${formatPaceRange(
+      pace.fastSecKm,
+      pace.slowSecKm,
+    )}/km，保持可对话。`,
     purpose,
     status: 'adjusted',
     locked: false,

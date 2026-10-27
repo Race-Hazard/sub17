@@ -82,7 +82,13 @@ export function DayDetail({
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   const evaluations = actuals
     .filter((session) => TEST_TYPES.includes(session.type))
-    .map((session) => evaluateQualitySession(session, planned, vdot))
+    .map((session) => {
+      const plannedFor =
+        session.plannedSessionId === planned.id || session.type === planned.type
+          ? planned
+          : undefined
+      return evaluateQualitySession(session, plannedFor, vdot)
+    })
     .filter((evaluation): evaluation is QualityEvaluation => evaluation != null)
   const actualKm = actuals.reduce((sum, session) => sum + (session.distanceM ?? 0), 0)
   const actualSec = actuals.reduce((sum, session) => sum + (session.durationSec ?? 0), 0)
