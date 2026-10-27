@@ -138,6 +138,18 @@ export interface PlannedSession {
   downgrade: string
   countsTowardCompliance: boolean
   status: 'pending' | 'done' | 'skipped' | 'adjusted'
+  /** Manually scheduled test day: automatic replanning must not downgrade it. */
+  locked?: boolean
+}
+
+/** A temporary test day the athlete scheduled outside the 26-week checkpoints. */
+export interface TestDay {
+  date: IsoDate
+  distanceM: number
+  targetTimeSec?: number
+  note?: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface PlanAdjustment {
@@ -148,6 +160,7 @@ export interface PlanAdjustment {
     | 'reduce-volume'
     | 'adjust-volume'
     | 'apply-advice'
+    | 'schedule-test'
   reason: string
   at: string
 }
@@ -195,7 +208,7 @@ export interface MetaRow {
 /** Soft-delete marker so a deletion propagates instead of being resurrected. */
 export interface Tombstone {
   key: string
-  kind: 'session' | 'sleep' | 'checkin' | 'body'
+  kind: 'session' | 'sleep' | 'checkin' | 'body' | 'testDay'
   at: string
 }
 

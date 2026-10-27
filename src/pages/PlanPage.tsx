@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { CalendarCheck, RefreshCw } from 'lucide-react'
+import { CalendarCheck, ChevronRight, RefreshCw, Timer, Trash2 } from 'lucide-react'
 import { Button, Card, EmptyState, Pill, ProgressBar, SectionTitle } from '../components/ui'
 import { AdviceBox } from '../components/QualityCard'
+import { DayDetail } from '../components/DayDetail'
 import {
   adjustNextWeek,
   complianceForPlan,
@@ -10,16 +11,32 @@ import {
 import { qualityAdviceFromSummary } from '../domain/quality'
 import {
   addDaysIso,
+  daysBetween,
+  formatDuration,
   formatKm,
   formatPaceRange,
   formatShortDate,
   formatWeekday,
   mondayOf,
+  parseDuration,
 } from '../domain/format'
 import { phaseName, weeklyTargetKm, WEEK_BLUEPRINTS } from '../domain/plan'
-import type { Checkin, IsoDate, Plan, PlannedSession, Profile, Session } from '../domain/types'
+import type {
+  Checkin,
+  IsoDate,
+  Plan,
+  PlannedSession,
+  Profile,
+  Session,
+  TestDay,
+} from '../domain/types'
 import type { TrainingStatus } from '../domain/status'
-import { ensurePlanForWeek, regeneratePlanWeek } from '../db/repo'
+import {
+  ensurePlanForWeek,
+  regeneratePlanWeek,
+  scheduleTestDay,
+  unscheduleTestDay,
+} from '../db/repo'
 
 export function PlanPage({
   profile,
@@ -27,23 +44,43 @@ export function PlanPage({
   activePlan,
   status,
   sessions,
+  testDays,
   checkins,
   today,
+  onLog,
 }: {
   profile: Profile
   plans: Plan[]
   activePlan: Plan | null
   status: TrainingStatus
   sessions: Session[]
+  testDays: TestDay[]
   checkins: Checkin[]
   today: IsoDate
+  onLog: (prefill?: Partial<Session>) => void
 }) {
   const [generating, setGenerating] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [selected, setSelected] = useState<PlannedSession | null>(null)
+  const [scheduleOpen, setScheduleOpen] = useState(false)
+  const [testDate, setTestDate] = useState(today)
+  const [testDistanceM, setTestDistanceM] = useState(5000)
+  const [testTimeText, setTestTimeText] = useState('')
+  const [testNote, setTestNote] = useState('')
+  const [scheduleMessage, setScheduleMessage] = useState<string | null>(null)
+  const [scheduleError, setScheduleError] = useState<string | null>(null)
+  const [scheduling, setScheduling] = useState(false)
 
   const nextWeekIndex = activePlan ? Math.min(26, activePlan.weekIndex + 1) : 1
   const nextWeekStart = activePlan ? addDaysIso(activePlan.weekStart, 7) : mondayOf(today)
   const nextPlan = plans.find((p) => p.weekStart === nextWeekStart)
+
+  const earliestTestDate = today > profile.startDate ? today : profile.startDate
+  const latestTestDate = addDaysIso(profile.startDate, 26 * 7 - 1)
+  const testWindowOpen = earliestTestDate <= latestTestDate
+  const upcomingTests = testDays
+    .filter((testDay) => testDay.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date))
 
   const generateNext = async () => {
     if (!activePlan) return
@@ -95,6 +132,216 @@ export function PlanPage({
     setGenerating(false)
   }
 
+  const submitTestDay = async () => {
+    const rawTime = testTimeText.trim()
+    const targetTimeSec = rawTime ? parseDuration(rawTime) : null
+    if (rawTime && targetTimeSec == null) {
+      setScheduleError('目标时间格式应为 分:秒，例如 19:30。')
+      return
+    }
+    if (!testWindowOpen || testDate < earliestTestDate || testDate > latestTestDate) {
+      setScheduleError(`日期需在 ${formatShortDate(earliestTestDate)} 到 ${formatShortDate(latestTestDate)} 之间。`)
+      return
+    }
+    setScheduling(true)
+    setScheduleError(null)
+    try {
+      await scheduleTestDay({
+        date: testDate,
+        distanceM: testDistanceM,
+        targetTimeSec: targetTimeSec ?? undefined,
+        note: testNote.trim() || undefined,
+        vdot: status.currentVdot,
+        profile,
+        today,
+      })
+      setScheduleOpen(false)
+      setTestTimeText('')
+      setTestNote('')
+      setScheduleMessage(
+        `已安排 ${formatShortDate(testDate)} ${formatWeekday(testDate)}：${formatKm(
+          testDistanceM,
+        )} 计时赛；当天课表已替换，前后 48 小时强度课已降级。`,
+      )
+    } catch (error) {
+      setScheduleError(error instanceof Error ? error.message : '安排测试日失败')
+    } finally {
+      setScheduling(false)
+    }
+  }
+
+  const removeTestDay = async (date: IsoDate) => {
+    if (
+      !window.confirm(
+        '移除测试日会重新生成受影响的周课表（已有训练记录不会删除）。继续？',
+      )
+    ) {
+      return
+    }
+    setScheduling(true)
+    try {
+      const result = await unscheduleTestDay({
+        date,
+        vdot: status.currentVdot,
+        profile,
+        today,
+      })
+      setScheduleMessage(
+        `已移除 ${formatShortDate(date)} 的测试日，恢复 ${result.restored} 周课表。`,
+      )
+    } finally {
+      setScheduling(false)
+    }
+  }
+
+  const testDayCard = (
+    <Card className="space-y-3">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-200">
+            <Timer size={15} /> 测试日 · 计时赛
+          </div>
+          <div className="mt-1 text-[11px] leading-relaxed text-muted">
+            临时指定本周或未来几周的某天做测试。当天课表替换为计时赛，前后 48 小时的质量课和长距离自动降为轻松跑；自动重排不会改掉测试日。
+          </div>
+        </div>
+        <Button
+          size="sm"
+          variant={scheduleOpen ? 'secondary' : 'primary'}
+          onClick={() => {
+            setScheduleOpen((value) => !value)
+            setTestDate((value) =>
+              value < earliestTestDate
+                ? earliestTestDate
+                : value > latestTestDate
+                  ? latestTestDate
+                  : value,
+            )
+            setScheduleError(null)
+          }}
+          disabled={!testWindowOpen || scheduling}
+        >
+          {scheduleOpen ? '收起' : '安排'}
+        </Button>
+      </div>
+
+      {upcomingTests.length > 0 ? (
+        <div className="space-y-1.5">
+          {upcomingTests.slice(0, 6).map((testDay) => (
+            <div
+              key={testDay.date}
+              className="flex items-center justify-between gap-2 rounded-xl border border-line/70 bg-ink/30 px-2.5 py-2"
+            >
+              <div className="min-w-0">
+                <div className="truncate text-xs text-slate-200">
+                  {formatShortDate(testDay.date)} {formatWeekday(testDay.date)} ·{' '}
+                  {formatKm(testDay.distanceM)} 计时赛
+                  {testDay.targetTimeSec
+                    ? ` · 目标 ${formatDuration(testDay.targetTimeSec)}`
+                    : ''}
+                </div>
+                <div className="mt-0.5 truncate text-[10px] text-muted">
+                  还有 {daysBetween(today, testDay.date)} 天
+                  {testDay.note ? ` · ${testDay.note}` : ''}
+                </div>
+              </div>
+              <button
+                onClick={() => void removeTestDay(testDay.date)}
+                disabled={scheduling}
+                className="shrink-0 rounded-lg p-1.5 text-muted hover:text-bad disabled:opacity-40"
+                aria-label="移除测试日"
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-[11px] text-muted">还没有临时测试日。检查点周的计时赛不受影响。</div>
+      )}
+
+      {scheduleOpen ? (
+        <div className="space-y-2 border-t border-line/70 pt-3">
+          <label className="block text-xs text-muted">
+            日期
+            <input
+              type="date"
+              value={testDate}
+              min={earliestTestDate}
+              max={latestTestDate}
+              onChange={(event) => setTestDate(event.target.value)}
+              className="mt-1 w-full rounded-xl border border-line bg-ink/60 px-3 py-2.5 text-base text-slate-100 outline-none focus:border-accent"
+            />
+          </label>
+          <div>
+            <div className="text-xs text-muted">测试距离</div>
+            <div className="mt-1 flex gap-1.5">
+              {[3000, 5000, 10000].map((distanceM) => (
+                <button
+                  key={distanceM}
+                  onClick={() => setTestDistanceM(distanceM)}
+                  className={`flex-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                    testDistanceM === distanceM
+                      ? 'border-accent bg-accent/15 text-accent'
+                      : 'border-line bg-surface-2/50 text-muted hover:text-slate-200'
+                  }`}
+                >
+                  {formatKm(distanceM)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block text-xs text-muted">
+              目标时间（可选）
+              <input
+                value={testTimeText}
+                onChange={(event) => setTestTimeText(event.target.value)}
+                inputMode="numeric"
+                placeholder="19:30"
+                className="mt-1 w-full rounded-xl border border-line bg-ink/60 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-accent"
+              />
+            </label>
+            <label className="block text-xs text-muted">
+              备注（可选）
+              <input
+                value={testNote}
+                onChange={(event) => setTestNote(event.target.value)}
+                placeholder="场地 / 配速策略"
+                className="mt-1 w-full rounded-xl border border-line bg-ink/60 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-accent"
+              />
+            </label>
+          </div>
+          <p className="text-[10px] leading-relaxed text-muted">
+            目标时间留空时，按当前 VDOT 在该距离的等价成绩评估。测试日同样计入完成度，但只有计时赛成绩会更新 VDOT。
+          </p>
+          {scheduleError ? (
+            <div className="rounded-lg border border-bad/25 bg-bad/10 px-2.5 py-1.5 text-[11px] text-bad">
+              {scheduleError}
+            </div>
+          ) : null}
+          <Button
+            className="w-full"
+            size="sm"
+            onClick={() => void submitTestDay()}
+            disabled={scheduling || !testWindowOpen}
+          >
+            {scheduling ? '写入中…' : '写入计划并调整临近训练'}
+          </Button>
+        </div>
+      ) : null}
+
+      {!testWindowOpen ? (
+        <div className="text-[11px] text-muted">26 周计划周期已结束，不能再安排测试日。</div>
+      ) : null}
+      {scheduleMessage ? (
+        <div className="rounded-xl border border-good/25 bg-good/10 px-3 py-2 text-[11px] leading-relaxed text-good">
+          {scheduleMessage}
+        </div>
+      ) : null}
+    </Card>
+  )
+
   if (!activePlan) {
     return (
       <div className="space-y-4">
@@ -106,6 +353,8 @@ export function PlanPage({
           title="还没有生成计划"
           hint={`计划从 ${profile.startDate} 开始。到「今日」页签到，或等到周一自动生成。`}
         />
+        <SectionTitle>测试日</SectionTitle>
+        {testDayCard}
       </div>
     )
   }
@@ -151,9 +400,11 @@ export function PlanPage({
         <p className="text-xs leading-relaxed text-muted">{activePlan.rationale}</p>
       </Card>
 
+      {testDayCard}
+
       {activePlan.adjustments.length > 0 ? (
         <Card className="space-y-1.5">
-          <div className="text-xs font-semibold text-slate-200">最近按实际训练调整</div>
+          <div className="text-xs font-semibold text-slate-200">最近计划调整</div>
           {activePlan.adjustments
             .slice(-3)
             .reverse()
@@ -174,15 +425,23 @@ export function PlanPage({
         {activePlan.plannedSessions.map((planned) => {
           const s = statusOf(planned)
           return (
-            <Card key={planned.id} className="space-y-1.5 py-3">
+            <Card
+              key={planned.id}
+              className="space-y-1.5 py-3"
+              onClick={() => setSelected(planned)}
+            >
               <div className="flex items-start justify-between gap-2">
-                <div className="flex items-baseline gap-2">
-                  <span className="w-10 text-[11px] text-muted">{formatWeekday(planned.date)}</span>
-                  <span className="text-sm font-medium text-slate-200">{planned.title}</span>
+                <div className="flex min-w-0 items-baseline gap-2">
+                  <span className="w-10 shrink-0 text-[11px] text-muted">{formatWeekday(planned.date)}</span>
+                  <span className="truncate text-sm font-medium text-slate-200">{planned.title}</span>
+                  {planned.locked ? <Pill tone="warn">测试日</Pill> : null}
                 </div>
-                <Pill tone={s === 'done' ? 'good' : s === 'skipped' ? 'bad' : s === 'adjusted' ? 'warn' : 'neutral'}>
-                  {s === 'done' ? '已完成' : s === 'skipped' ? '未完成' : s === 'adjusted' ? '已调整' : '待完成'}
-                </Pill>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Pill tone={s === 'done' ? 'good' : s === 'skipped' ? 'bad' : s === 'adjusted' ? 'warn' : 'neutral'}>
+                    {s === 'done' ? '已完成' : s === 'skipped' ? '未完成' : s === 'adjusted' ? '已调整' : '待完成'}
+                  </Pill>
+                  <ChevronRight size={14} className="text-muted" />
+                </div>
               </div>
               <div className="pl-12 text-[11px] leading-relaxed text-muted">
                 {planned.distanceM ? `${formatKm(planned.distanceM)} · ` : ''}
@@ -255,6 +514,22 @@ export function PlanPage({
           <CalendarCheck size={14} /> 检查点：W4 / W8 / W12 / W16 / W20 / W26
         </div>
       </Card>
+
+      {selected ? (
+        <DayDetail
+          date={selected.date}
+          planned={selected}
+          sessions={sessions}
+          vdot={status.currentVdot}
+          today={today}
+          status={statusOf(selected)}
+          onClose={() => setSelected(null)}
+          onLog={(prefill) => {
+            setSelected(null)
+            onLog(prefill)
+          }}
+        />
+      ) : null}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { formatPace, formatPaceRange } from './format'
+import { formatKm, formatPace, formatPaceRange } from './format'
 import type {
   IsoDate,
   PaceRange,
@@ -269,6 +269,25 @@ function adviceFor(
   const paceText = formatPaceRange(pace.fastSecKm, pace.slowSecKm)
   const repText = repDistanceM ? `${Math.round(repDistanceM / 100) * 100} m` : '组'
   const repCount = Math.max(1, reps)
+
+  if (kind === 'TEST') {
+    const totalM = repDistanceM ? repDistanceM * repCount : 5000
+    const distanceText = totalM >= 1000 ? formatKm(totalM) : '测试距离'
+    if (verdict === 'excellent' || verdict === 'onTarget') {
+      return `下次 ${distanceText} 计时赛：前 1 km 稳，最后 1 km 提速；赛前 2 天只做轻松跑 + 加速跑。只有计时赛成绩会更新 VDOT。`
+    }
+    if (verdict === 'fade') {
+      return `下次 ${distanceText} 计时赛：前 1 km 刻意慢 2–3 秒/400 m，先稳后快；先补两周轻松跑和睡眠。`
+    }
+    if (verdict === 'fast') {
+      return `快于目标但 RPE 不高：保持同量，不要连续测；下次用 5K 配速的 3×1 km 校准。`
+    }
+    if (verdict === 'slow' || verdict === 'overload') {
+      return `没有达到目标或强度偏高：先补两周有氧和睡眠，再用 3×1 km @ 5K 配速校准，不硬测。`
+    }
+    return `这次没有完成计时：先恢复，再安排一次 3×1 km @ 5K 配速，完成后再测。`
+  }
+
   const continuous = nextWorkout?.mode === 'continuous' || (kind === 'T' && repCount <= 1)
   const recovery = continuous
     ? '连续完成，不设组间恢复'
@@ -279,14 +298,7 @@ function adviceFor(
         : '组间 2–3 分钟慢跑'
 
   let volume = `${repCount}×${repText}`
-  if (kind === 'TEST') {
-    volume =
-      verdict === 'excellent' || verdict === 'onTarget'
-        ? '下次 5 km 计时赛：前 1 km 稳，最后 1 km 提速'
-        : verdict === 'fade'
-          ? '3×1 km @ 5K 配速'
-          : '先恢复 2 周，再做 3×1 km @ 5K'
-  } else if (nextWorkout?.mode === 'continuous') {
+  if (nextWorkout?.mode === 'continuous') {
     const delta = nextWorkout.continuousMinDelta ?? 0
     volume =
       delta === 0

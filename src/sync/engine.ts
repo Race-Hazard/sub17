@@ -22,7 +22,7 @@ export interface SyncResult {
 }
 
 export async function collectSyncData(): Promise<SyncData> {
-  const [profile, sessions, checkins, sleep, body, plans, meta, tombstones] =
+  const [profile, sessions, checkins, sleep, body, plans, testDays, meta, tombstones] =
     await Promise.all([
       db.profile.toArray(),
       db.sessions.toArray(),
@@ -30,16 +30,17 @@ export async function collectSyncData(): Promise<SyncData> {
       db.sleep.toArray(),
       db.body.toArray(),
       db.plans.toArray(),
+      db.testDays.toArray(),
       db.meta.toArray(),
       db.tombstones.toArray(),
     ])
-  return { profile, sessions, checkins, sleep, body, plans, meta, tombstones }
+  return { profile, sessions, checkins, sleep, body, plans, testDays, meta, tombstones }
 }
 
 export async function applySyncData(data: SyncData): Promise<void> {
   await db.transaction(
     'rw',
-    [db.profile, db.sessions, db.checkins, db.sleep, db.body, db.plans, db.meta, db.tombstones],
+    [db.profile, db.sessions, db.checkins, db.sleep, db.body, db.plans, db.testDays, db.meta, db.tombstones],
     async () => {
       await Promise.all([
         db.profile.clear(),
@@ -48,6 +49,7 @@ export async function applySyncData(data: SyncData): Promise<void> {
         db.sleep.clear(),
         db.body.clear(),
         db.plans.clear(),
+        db.testDays.clear(),
         db.meta.clear(),
         db.tombstones.clear(),
       ])
@@ -57,6 +59,7 @@ export async function applySyncData(data: SyncData): Promise<void> {
       await db.sleep.bulkPut(data.sleep)
       await db.body.bulkPut(data.body)
       await db.plans.bulkPut(data.plans)
+      await db.testDays.bulkPut(data.testDays ?? [])
       await db.meta.bulkPut(data.meta)
       await db.tombstones.bulkPut(data.tombstones)
     },
@@ -71,6 +74,7 @@ function latestUpdate(data: SyncData): string {
     ...data.checkins.map((s) => s.updatedAt),
     ...data.profile.map((p) => p.updatedAt),
     ...data.plans.map((p) => p.createdAt),
+    ...(data.testDays ?? []).map((t) => t.updatedAt),
     ...data.tombstones.map((t) => t.at),
   ]
   return times.reduce((max, t) => (t > max ? t : max), '')

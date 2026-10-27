@@ -7,10 +7,11 @@ import type {
   Profile,
   Session,
   SleepRecord,
+  TestDay,
   Tombstone,
 } from '../domain/types'
 
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 
 export class Sub17DB extends Dexie {
   sessions!: Table<Session, string>
@@ -21,6 +22,7 @@ export class Sub17DB extends Dexie {
   meta!: Table<MetaRow, string>
   tombstones!: Table<Tombstone, string>
   body!: Table<BodyMetric, string>
+  testDays!: Table<TestDay, string>
 
   constructor(name = 'sub17') {
     super(name)
@@ -50,6 +52,17 @@ export class Sub17DB extends Dexie {
       meta: 'key',
       tombstones: 'key, kind, at',
       body: 'date, updatedAt',
+    })
+    this.version(4).stores({
+      sessions: 'id, date, type, plannedSessionId, isTest',
+      checkins: 'date, status',
+      sleep: 'date',
+      plans: 'id, &weekStart, weekIndex, status',
+      profile: 'id',
+      meta: 'key',
+      tombstones: 'key, kind, at',
+      body: 'date, updatedAt',
+      testDays: 'date, updatedAt',
     })
   }
 }

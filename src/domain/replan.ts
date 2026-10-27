@@ -168,7 +168,7 @@ export function replanRemainingWeek(input: ReplanInput): Plan | null {
   let changed = false
 
   const longPlanned = future.find((s) => s.type === 'long')
-  if (longPlanned) {
+  if (longPlanned && !longPlanned.locked) {
     const duplicateLong = actualLong.some((s) => s.date < longPlanned.date)
     const gapToLong = lastHardDate ? daysBetween(lastHardDate, longPlanned.date) : 99
     const tooCloseToLong = gapToLong < 2
@@ -202,6 +202,7 @@ export function replanRemainingWeek(input: ReplanInput): Plan | null {
 
   for (const session of future) {
     if (!isQualityType(session.type)) continue
+    if (session.locked) continue
     const gap = lastHardDate ? daysBetween(lastHardDate, session.date) : 99
     const tooClose = gap < 2
     const tooMany = actualQuality.length >= 2
@@ -239,6 +240,7 @@ export function replanRemainingWeek(input: ReplanInput): Plan | null {
   const advisedKinds = new Set<QualityKind>()
   for (const session of future) {
     if (!isQualityType(session.type)) continue
+    if (session.locked) continue
     const zone = session.workout?.zone
     const kind: QualityKind | null =
       zone === 'I'

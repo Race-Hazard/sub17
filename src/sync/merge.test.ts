@@ -94,6 +94,54 @@ describe('sync merge', () => {
     expect(merged.plans[0].status).toBe('active')
   })
 
+  it('merges manual test days and propagates their deletion', () => {
+    const local = {
+      ...emptySyncData(),
+      testDays: [
+        {
+          date: '2026-10-24',
+          distanceM: 5000,
+          createdAt: '2026-10-18T10:00:00.000Z',
+          updatedAt: '2026-10-18T10:00:00.000Z',
+        },
+      ],
+    }
+    const remote = {
+      ...emptySyncData(),
+      testDays: [
+        {
+          date: '2026-10-24',
+          distanceM: 10000,
+          createdAt: '2026-10-18T10:00:00.000Z',
+          updatedAt: '2026-10-18T11:00:00.000Z',
+        },
+      ],
+    }
+    const merged = mergeSyncData(local, remote)
+    expect(merged.testDays).toHaveLength(1)
+    expect(merged.testDays[0].distanceM).toBe(10000)
+
+    const deleted = {
+      ...local,
+      tombstones: [
+        {
+          key: 'testDay:2026-10-24',
+          kind: 'testDay' as const,
+          at: '2026-10-18T12:00:00.000Z',
+        },
+      ],
+    }
+    expect(mergeSyncData(deleted, remote).testDays).toHaveLength(0)
+  })
+
+  it('tolerates older cloud files without testDays', () => {
+    const local = { ...emptySyncData() }
+    const legacyRemote = { ...emptySyncData() } as Record<string, unknown>
+    delete legacyRemote.testDays
+    const merged = mergeSyncData(local, legacyRemote as never)
+    expect(merged.testDays).toEqual([])
+  })
+
   it('merges onboarding and sync metadata sensibly', () => {
     const local = {
       ...emptySyncData(),

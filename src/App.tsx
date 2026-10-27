@@ -15,6 +15,7 @@ import { db } from './db/schema'
 import { ensureSeed } from './db/seed'
 import {
   activateCurrentWeekPlan,
+  applyStoredTestDays,
   ensurePlanForWeek,
   getMeta,
   savePlan,
@@ -35,6 +36,7 @@ import type {
   Profile,
   Session,
   SleepRecord,
+  TestDay,
 } from './domain/types'
 import { vdotFromPerformance } from './domain/vdot'
 
@@ -43,6 +45,7 @@ const EMPTY_SLEEPS: SleepRecord[] = []
 const EMPTY_CHECKINS: Checkin[] = []
 const EMPTY_PLANS: Plan[] = []
 const EMPTY_BODY: BodyMetric[] = []
+const EMPTY_TEST_DAYS: TestDay[] = []
 
 function vdotNow(sessions: Session[], profile: Profile, today: string): number {
   const tests = sessions
@@ -77,6 +80,7 @@ export default function App() {
   const ensuredRef = useRef('')
   const autoNextRef = useRef('')
   const replanRef = useRef(false)
+  const testRepairRef = useRef('')
 
   const profile = useLiveQuery(() => db.profile.get('me'), [])
   const sessions = useLiveQuery(() => db.sessions.toArray(), []) ?? EMPTY_SESSIONS
@@ -84,6 +88,7 @@ export default function App() {
   const checkins = useLiveQuery(() => db.checkins.toArray(), []) ?? EMPTY_CHECKINS
   const plans = useLiveQuery(() => db.plans.toArray(), []) ?? EMPTY_PLANS
   const bodyMetrics = useLiveQuery(() => db.body.toArray(), []) ?? EMPTY_BODY
+  const testDays = useLiveQuery(() => db.testDays.toArray(), []) ?? EMPTY_TEST_DAYS
   const onboardedMeta = useLiveQuery(() => db.meta.get('onboarded'), [])
 
   useEffect(() => {
@@ -116,6 +121,20 @@ export default function App() {
   useEffect(() => {
     if (seeded && onboarded) void initSync()
   }, [seeded, onboarded])
+
+  // Re-apply manually scheduled test days after a sync or reload, in case the
+  // merged plan came from a device that never saw them.
+  useEffect(() => {
+    if (!seeded || !profile || !onboarded || testDays.length === 0) return
+    const key = testDays
+      .map((testDay) => `${testDay.date}:${testDay.updatedAt}`)
+      .join('|')
+    if (testRepairRef.current === key) return
+    testRepairRef.current = key
+    void applyStoredTestDays(vdotNow(sessions, profile, today), today).catch((error) =>
+      console.error('test-day repair failed', error),
+    )
+  }, [seeded, profile, onboarded, testDays, sessions, today])
 
   useEffect(() => {
     if (!seeded || !profile || !onboarded) return
@@ -325,8 +344,10 @@ export default function App() {
             activePlan={activePlan}
             status={status}
             sessions={sessions}
+            testDays={testDays}
             checkins={checkins}
             today={today}
+            onLog={openLog}
           />
         )
       case 'status':

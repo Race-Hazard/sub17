@@ -167,6 +167,21 @@ describe('quality session evaluation', () => {
     expect(summary.last?.targetPace?.fastSecKm).toBeGreaterThan(240)
   })
 
+  it('gives time-trial advice without interval recovery wording', () => {
+    const session = qualitySession([232], 5000, 9, 'time_trial', [])
+    session.durationSec = 1160
+    const evaluation = evaluateQualitySession(
+      session,
+      planned('p1', 'time_trial', '5K', 5000, { fastSecKm: 234, slowSecKm: 234 }),
+      50,
+    )
+    expect(evaluation?.kind).toBe('TEST')
+    expect(evaluation?.verdict).toBe('excellent')
+    expect(evaluation?.nextAdvice).toContain('计时赛')
+    expect(evaluation?.nextAdvice).not.toContain('组间')
+    expect(evaluation?.nextWorkout).toBeNull()
+  })
+
   it('summarizes the latest evaluation and latest per kind', () => {
     const interval = qualitySession([232, 233, 234], 9000, 8)
     const plannedThreshold = {

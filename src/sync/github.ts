@@ -6,6 +6,7 @@ import type {
   Profile,
   Session,
   SleepRecord,
+  TestDay,
   Tombstone,
 } from '../domain/types'
 import type { SyncData } from './merge'
@@ -137,6 +138,7 @@ export function parseSyncPayload(value: unknown): SyncData {
     sleep: readArray<SleepRecord>('sleep'),
     body: Array.isArray(raw.body) ? (raw.body as BodyMetric[]) : [],
     plans: readArray<Plan>('plans'),
+    testDays: Array.isArray(raw.testDays) ? (raw.testDays as TestDay[]) : [],
     meta: readArray<MetaRow>('meta'),
     tombstones: Array.isArray(raw.tombstones) ? (raw.tombstones as Tombstone[]) : [],
   }

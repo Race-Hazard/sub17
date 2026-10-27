@@ -6,6 +6,7 @@ import type {
   Profile,
   Session,
   SleepRecord,
+  TestDay,
   Tombstone,
 } from '../domain/types'
 
@@ -16,6 +17,7 @@ export interface SyncData {
   sleep: SleepRecord[]
   body: BodyMetric[]
   plans: Plan[]
+  testDays: TestDay[]
   meta: MetaRow[]
   tombstones: Tombstone[]
 }
@@ -28,6 +30,7 @@ export function emptySyncData(): SyncData {
     sleep: [],
     body: [],
     plans: [],
+    testDays: [],
     meta: [],
     tombstones: [],
   }
@@ -160,6 +163,16 @@ export function mergeSyncData(local: SyncData, remote: SyncData): SyncData {
     return !deletedAt || deletedAt < b.updatedAt
   })
 
+  const testDays = mergeByKey(
+    local.testDays ?? [],
+    remote.testDays ?? [],
+    (t) => t.date,
+    (t) => t.updatedAt,
+  ).filter((t) => {
+    const deletedAt = tombstoneAt.get(`testDay:${t.date}`)
+    return !deletedAt || deletedAt < t.updatedAt
+  })
+
   return {
     profile: mergeByKey(
       local.profile,
@@ -172,6 +185,7 @@ export function mergeSyncData(local: SyncData, remote: SyncData): SyncData {
     sleep,
     body,
     plans: mergePlans(local.plans, remote.plans),
+    testDays,
     meta: mergeMeta(local.meta, remote.meta),
     tombstones,
   }
