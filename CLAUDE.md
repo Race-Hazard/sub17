@@ -30,8 +30,8 @@
   - 使用只授权该仓库的 fine-grained token（Contents: Read and write）；token 只在 App 本机 localStorage，**不要写入仓库或聊天**
 - Git remote 已改为 SSH：`git@github.com:Race-Hazard/sub17.git`
 - `git push` 后 GitHub Actions 自动测试、构建、部署 Pages；不需要手动上传 dist
-- 最新提交：`5e69ccf`（首页快速记录→计划同步；之前：`e572fb1` 临时测试日 + 计划日详情、`8ddc0e3` 测试日评估修复）
-- 最新部署：`5e69ccf` GitHub Actions **success**（Pages 已更新）
+- 最新提交：`f854455`（计划页准备度/睡眠摘要 + 首页快速记录→计划同步；之前：`5e69ccf`、`e572fb1` 临时测试日 + 计划日详情、`8ddc0e3` 测试日评估修复）
+- 最新部署：`f854455` GitHub Actions **success**（Pages 已更新）
 - 之前：`ba0fef7`（阈值分组 + 按时间模式）、`30a7ac0`（私有 GitHub 同步）
 
 ## 常用命令
