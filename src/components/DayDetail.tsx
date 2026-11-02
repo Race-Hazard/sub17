@@ -73,7 +73,7 @@ export function DayDetail({
   sessions: Session[]
   vdot: number
   today: IsoDate
-  status: 'done' | 'pending' | 'skipped' | 'adjusted'
+  status: 'done' | 'rest' | 'pending' | 'skipped' | 'adjusted'
   onClose: () => void
   onLog: (prefill?: Partial<Session>) => void
 }) {
@@ -124,11 +124,13 @@ export function DayDetail({
               >
                 {status === 'done'
                   ? '已完成'
-                  : status === 'skipped'
-                    ? '未完成'
-                    : status === 'adjusted'
-                      ? '已调整'
-                      : '待完成'}
+                  : status === 'rest'
+                    ? '已休息'
+                    : status === 'skipped'
+                      ? '未完成'
+                      : status === 'adjusted'
+                        ? '已调整'
+                        : '待完成'}
               </Pill>
               <Pill tone={planned.type === 'rest' ? 'neutral' : 'accent'}>
                 {TYPE_LABEL[planned.type] ?? planned.type}
@@ -179,7 +181,7 @@ export function DayDetail({
 
         {actuals.length === 0 ? (
           <div className="mt-2">
-            {planned.type === 'rest' && status === 'done' ? (
+            {status === 'rest' || (planned.type === 'rest' && status === 'done') ? (
               <div className="rounded-xl border border-good/25 bg-good/10 px-3 py-2 text-xs text-good">
                 这天已记录为休息。
               </div>

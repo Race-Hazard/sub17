@@ -361,18 +361,25 @@ export function PlanPage({
 
   const compliance = complianceForPlan(activePlan, sessions, checkins, profile.createdDate)
 
-  const statusOf = (planned: PlannedSession): 'done' | 'pending' | 'skipped' | 'adjusted' => {
-    if (planned.status === 'adjusted') return 'adjusted'
+  type DayStatus = 'done' | 'rest' | 'pending' | 'skipped' | 'adjusted'
+
+  const statusOf = (planned: PlannedSession): DayStatus => {
     if (profile.createdDate && planned.date < profile.createdDate) return 'adjusted'
-    if (planned.type === 'rest') {
-      return checkins.some((c) => c.date === planned.date && c.status === 'rest') ? 'done' : planned.date < today ? 'skipped' : 'pending'
-    }
+    const restRecorded =
+      checkins.some((c) => c.date === planned.date && c.status === 'rest') ||
+      sessions.some((s) => s.date === planned.date && s.type === 'rest')
     const actual = sessions.find(
       (s) =>
         s.date === planned.date &&
-        (s.plannedSessionId === planned.id || (s.type !== 'rest' && s.type !== 'strength')),
+        s.type !== 'rest' &&
+        s.type !== 'strength',
     )
+    if (planned.type === 'rest') {
+      return actual || restRecorded ? 'done' : planned.date < today ? 'skipped' : 'pending'
+    }
     if (actual) return 'done'
+    if (restRecorded) return 'rest'
+    if (planned.status === 'adjusted') return 'adjusted'
     return planned.date < today ? 'skipped' : 'pending'
   }
 
@@ -438,7 +445,7 @@ export function PlanPage({
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   <Pill tone={s === 'done' ? 'good' : s === 'skipped' ? 'bad' : s === 'adjusted' ? 'warn' : 'neutral'}>
-                    {s === 'done' ? '已完成' : s === 'skipped' ? '未完成' : s === 'adjusted' ? '已调整' : '待完成'}
+                    {s === 'done' ? '已完成' : s === 'rest' ? '已休息' : s === 'skipped' ? '未完成' : s === 'adjusted' ? '已调整' : '待完成'}
                   </Pill>
                   <ChevronRight size={14} className="text-muted" />
                 </div>

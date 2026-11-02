@@ -78,6 +78,17 @@ export function Today({
   const missingSleep = !sleep
 
   const saveRest = async () => {
+    const existingRest = todaySessions.find((session) => session.type === 'rest')
+    await saveSession({
+      id: existingRest?.id ?? uid(),
+      date: today,
+      type: 'rest',
+      notes: checkin?.notes,
+      source: 'manual',
+      plannedSessionId: planned?.type === 'rest' ? planned.id : undefined,
+      createdAt: existingRest?.createdAt ?? nowIso(),
+      updatedAt: nowIso(),
+    })
     await saveCheckin({
       date: today,
       status: 'rest',

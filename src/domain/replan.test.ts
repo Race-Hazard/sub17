@@ -122,6 +122,27 @@ describe('within-week replanning', () => {
     expect(futureSession(updated, '2026-10-22')?.type).toBe('easy')
   })
 
+  it('does not inflate later easy runs after an intentional rest day', () => {
+    const updated = replanRemainingWeek({
+      plan,
+      sessions: [],
+      checkins: [
+        {
+          date: '2026-10-19',
+          status: 'rest',
+          updatedAt: '2026-10-19T08:00:00.000Z',
+        },
+      ],
+      today: '2026-10-19',
+      vdot: 50,
+      readiness: 'green',
+    })
+    const before = plan.plannedSessions.find((s) => s.date === '2026-10-21')?.distanceM
+    const after =
+      updated?.plannedSessions.find((s) => s.date === '2026-10-21')?.distanceM ?? before
+    expect(after).toBe(before)
+  })
+
   it('applies the last same-kind advice to the next quality session', () => {
     const updated = replanRemainingWeek({
       plan,

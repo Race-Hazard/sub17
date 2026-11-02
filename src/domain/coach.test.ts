@@ -111,4 +111,64 @@ describe('compliance', () => {
     expect(result.completed).toBe(7)
     expect(result.rate).toBe(1)
   })
+
+  it('counts an intentional rest on a training day without crediting quality', () => {
+    const plan = generatePlanWeek({
+      weekIndex: 1,
+      weekStart: '2026-10-19',
+      vdot: 50,
+      profile,
+    })
+    const checkinOnly = complianceForPlan(
+      plan,
+      [],
+      [{ date: '2026-10-20', status: 'rest', updatedAt: '2026-10-20T00:00:00.000Z' }],
+    )
+    expect(checkinOnly.completed).toBe(1)
+    expect(checkinOnly.qualityCompleted).toBe(0)
+
+    const restSessionOnly = complianceForPlan(
+      plan,
+      [
+        {
+          id: 'rest-session',
+          date: '2026-10-22',
+          type: 'rest',
+          source: 'manual',
+          createdAt: '2026-10-22T00:00:00.000Z',
+          updatedAt: '2026-10-22T00:00:00.000Z',
+        },
+      ],
+      [],
+    )
+    expect(restSessionOnly.completed).toBe(1)
+    expect(restSessionOnly.qualityCompleted).toBe(0)
+  })
+
+  it('counts a run on a planned rest day as handled', () => {
+    const plan = generatePlanWeek({
+      weekIndex: 1,
+      weekStart: '2026-10-19',
+      vdot: 50,
+      profile,
+    })
+    const result = complianceForPlan(
+      plan,
+      [
+        {
+          id: 'sunday-run',
+          date: '2026-10-25',
+          type: 'easy',
+          distanceM: 5000,
+          durationSec: 1800,
+          source: 'manual',
+          createdAt: '2026-10-25T00:00:00.000Z',
+          updatedAt: '2026-10-25T00:00:00.000Z',
+        },
+      ],
+      [],
+    )
+    expect(result.completed).toBe(1)
+    expect(result.qualityCompleted).toBe(0)
+  })
 })

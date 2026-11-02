@@ -151,8 +151,9 @@ function matchingActual(planned: PlannedSession, sessions: Session[]): Session |
   return sessions.find(
     (s) =>
       s.date === planned.date &&
+      s.type !== 'rest' &&
       (s.plannedSessionId === planned.id ||
-        (RUN_LIKE.has(planned.type) && s.type !== 'rest' && s.type !== 'strength')),
+        (RUN_LIKE.has(planned.type) && s.type !== 'strength')),
   )
 }
 
@@ -169,6 +170,10 @@ export function complianceForPlan(
   const counted = plan.plannedSessions.filter(
     (s) => s.countsTowardCompliance && (!ignoreBefore || s.date >= ignoreBefore),
   )
+  const restDates = new Set([
+    ...checkins.filter((c) => c.status === 'rest').map((c) => c.date),
+    ...sessions.filter((s) => s.type === 'rest').map((s) => s.date),
+  ])
   const quality = counted.filter(isQuality)
   let completed = 0
   let qualityCompleted = 0
@@ -176,14 +181,20 @@ export function complianceForPlan(
 
   for (const planned of counted) {
     if (planned.type === 'rest') {
-      const rest = checkins.some((c) => c.date === planned.date && c.status === 'rest')
-      if (rest) completed += 1
+      const trained = sessions.some(
+        (s) =>
+          s.date === planned.date && s.type !== 'rest' && s.type !== 'strength',
+      )
+      if (restDates.has(planned.date) || trained) completed += 1
       else missing.push(planned)
       continue
     }
     const actual = matchingActual(planned, sessions)
     if (!actual) {
-      missing.push(planned)
+      // An intentional rest (from the Today quick action or the Log page)
+      // counts the day as handled, but never as a quality session.
+      if (restDates.has(planned.date)) completed += 1
+      else missing.push(planned)
       continue
     }
     const durationOk =

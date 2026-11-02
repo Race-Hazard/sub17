@@ -220,6 +220,7 @@ export default function App() {
     const actuals = [
       ...sessions.filter((s) => s.date >= weekStart && s.date <= weekEnd),
       ...checkins.filter((c) => c.date >= weekStart && c.date <= weekEnd),
+      ...sleeps.filter((s) => s.date >= weekStart && s.date <= weekEnd),
     ]
     const latestActual = actuals.reduce(
       (max, item) => (item.updatedAt > max ? item.updatedAt : max),

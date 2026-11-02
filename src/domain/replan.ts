@@ -130,7 +130,7 @@ function applyPlannedAdvice(
  * keeps the weekly volume close to target.
  */
 export function replanRemainingWeek(input: ReplanInput): Plan | null {
-  const { plan, sessions, today, readiness } = input
+  const { plan, sessions, checkins, today, readiness } = input
   const weekStart = plan.weekStart
   const weekEnd = addDaysIso(weekStart, 6)
   if (today < weekStart || today > weekEnd) return null
@@ -269,10 +269,32 @@ export function replanRemainingWeek(input: ReplanInput): Plan | null {
     }
   }
 
-  // Keep weekly volume near target by adjusting only future easy days.
+  // Keep weekly volume near target by adjusting only future easy days. An
+  // intentional rest day (quick action or Log page) is not missing volume to
+  // make up later, so it reduces the remaining target instead of inflating it.
+  const restDates = new Set<string>([
+    ...checkins.filter((c) => c.status === 'rest').map((c) => c.date),
+    ...sessions.filter((s) => s.type === 'rest').map((s) => s.date),
+  ])
+  const runDates = new Set(actualRuns.map((s) => s.date))
+  const intentionalRestKm = planned
+    .filter(
+      (s) =>
+        s.date >= weekStart &&
+        s.date <= weekEnd &&
+        s.date <= today &&
+        isRun(s.type) &&
+        !runDates.has(s.date) &&
+        restDates.has(s.date),
+    )
+    .reduce((sum, s) => sum + km(s), 0)
   const actualKm = actualRuns.reduce((sum, s) => sum + km(s), 0)
   const futureKm = future.reduce((sum, s) => sum + km(s), 0)
-  const desiredFuture = clamp(plan.targetKm - actualKm, 0, plan.targetKm)
+  const desiredFuture = clamp(
+    plan.targetKm - actualKm - intentionalRestKm,
+    0,
+    plan.targetKm,
+  )
   const delta = desiredFuture - futureKm
   const easyFuture = future.filter((s) => s.type === 'easy')
   if (Math.abs(delta) >= 1 && easyFuture.length > 0) {
