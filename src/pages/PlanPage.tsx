@@ -404,6 +404,31 @@ export function PlanPage({
           </span>
         </div>
         <ProgressBar value={compliance.completed} max={compliance.planned} tone={compliance.rate >= 0.85 ? 'good' : compliance.rate >= 0.7 ? 'warn' : 'bad'} />
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
+          <span>
+            准备度{' '}
+            <span
+              className={
+                status.readiness.level === 'green'
+                  ? 'text-good'
+                  : status.readiness.level === 'yellow'
+                    ? 'text-warn'
+                    : 'text-bad'
+              }
+            >
+              {status.readiness.level === 'green' ? '绿' : status.readiness.level === 'yellow' ? '黄' : '红'}
+            </span>
+          </span>
+          <span>
+            7 天睡眠{' '}
+            {status.sleep.totalAverageMin != null
+              ? `${(status.sleep.totalAverageMin / 60).toFixed(1)} h`
+              : '未记录'}
+          </span>
+          {status.sleep.debtMin != null ? (
+            <span>睡眠债 {(status.sleep.debtMin / 60).toFixed(1)} h</span>
+          ) : null}
+        </div>
         <p className="text-xs leading-relaxed text-muted">{activePlan.rationale}</p>
       </Card>
 
