@@ -15,8 +15,8 @@
 - 可选跨端同步：私有 GitHub 仓库 `sub17-data/sub17.json`
 - 中文 UI；手机 Android PWA；默认离线优先
 
-用户当前水平（2026-10）：2 km 7:28、400 m 58 s；目标 5 km sub-17。App 如实显示：
-当前 VDOT ≈ 49–50、5 km 等价 ≈ 20:05；6 个月更可能 17:50–18:20，sub-17 是 stretch（约 15–25%）。
+用户当前水平：2 km 7:28、400 m 58 s（2026-10）；Garmin 手表 VO2max 51（2026-11-02，手表估算）；目标 5 km sub-17。App 如实显示：
+当前有效 VDOT ≈ 49.2（2 km 测试约 30 天衰减后；原始 49.56）、5 km 等价 ≈ 20:13（原始 20:05）；6 个月更可能 17:50–18:20，sub-17 是 stretch（约 15–25%）。sub-17:00 对应 VDOT ≈ 60.2。
 2026-10-19 起改为**目标优先计划**：峰值 68–72 km/周，检查点 W4 19:15、W8 18:45、W12 3k 10:50、W16 17:55、W20 17:30、W26 sub-17；概率约 25–35%，但不是保证。
 
 ## 位置与部署
@@ -30,8 +30,8 @@
   - 使用只授权该仓库的 fine-grained token（Contents: Read and write）；token 只在 App 本机 localStorage，**不要写入仓库或聊天**
 - Git remote 已改为 SSH：`git@github.com:Race-Hazard/sub17.git`
 - `git push` 后 GitHub Actions 自动测试、构建、部署 Pages；不需要手动上传 dist
-- 最新提交：`f854455`（计划页准备度/睡眠摘要 + 首页快速记录→计划同步；之前：`5e69ccf`、`e572fb1` 临时测试日 + 计划日详情、`8ddc0e3` 测试日评估修复）
-- 最新部署：`f854455` GitHub Actions **success**（Pages 已更新）
+- 最新提交：`138ff24`（文档）；功能版本 `f854455`（计划页准备度/睡眠摘要 + 首页快速记录→计划同步；之前：`5e69ccf`、`e572fb1` 临时测试日 + 计划日详情、`8ddc0e3` 测试日评估修复）
+- 最新部署：`138ff24` GitHub Actions **success**（Pages 已更新）
 - 之前：`ba0fef7`（阈值分组 + 按时间模式）、`30a7ac0`（私有 GitHub 同步）
 
 ## 常用命令
@@ -83,6 +83,14 @@ vite.config.ts  base=/sub17/；vite-plugin-pwa；Vitest 配置
 - 提醒：App 内 20:30/07:30 + `.ics` 日历；没有后台推送
 - 未做：OCR、FIT、Strava/Garmin、后台 Web Push
 
+## Garmin / VDOT 结论（2026-11-02）
+
+- **Garmin VO2max 与 VDOT 不是同一指标**：Garmin 是根据配速+心率估算的生理 VO2max（ml/kg/min）；VDOT 是由计时赛成绩按 Daniels 公式反推的等效有氧水平，直接决定 E/M/T/I/R 配速。
+- 用户手表 VO2max 51（2026-11-02）vs App 有效 VDOT 49.2：51 约等价 5K 19:36，49.2 约 20:13；差距在两种估算的正常误差内，不矛盾。
+- **不要因为手表 51 就把设置页「手动 VDOT」填 51**：手动 VDOT 只是没有有效测试时的兜底（`bestCurrentVdot ?? manualVdot ?? seedVdot`），有 8 周内测试时不会覆盖。要更新 App，跑一次 2/3/5 km 计时赛并记录为「计时赛」。
+- Garmin 570 取数：官方无个人可用 API；可行路线=Garmin Connect 网页单条导出 FIT/TCX/GPX、全部活动 CSV、全量数据 ZIP、USB/MTP 拷贝 `GARMIN/Activity/*.fit`；自动同步需桌面脚本（garminconnect/garth/garmcli）或 intervals.icu/Strava 中台/代理。
+- 建议下一步先做 **TCX 导入**（有圈速+心率，XML 易解析），再做 **FIT 导入**（最全，官方 `@garmin/fitsdk`），CSV 批量补历史。
+
 ## 修改规则（给后续 agent）
 
 1. 先读本文件 + `README.md`，再读要改的 `src/` 文件。
@@ -96,8 +104,8 @@ vite.config.ts  base=/sub17/；vite-plugin-pwa；Vitest 配置
 
 ## 待办 / 用户侧
 
-- **手机**：Android 无 Chrome，用 Edge 安装 PWA；若已安装，先手动更新到 `de48b7f`（旧 Service Worker 缓存），之后走「重启更新」提示条。
+- **手机**：Android 无 Chrome，用 Edge 安装 PWA；若已安装，先手动更新到最新部署（`138ff24` / 功能 `f854455`），之后走「重启更新」提示条。
 - **云同步**：若尚未配置，创建私有 `sub17-data` + fine-grained token（Contents: Read and write），在设置页填 `Race-Hazard / sub17-data / sub17.json / main / token`；不要索要或粘贴 token。
-- **验收**：身体页记身高/体重 → 睡眠页填午睡 → 记一次质量课看今日页评估卡 → 计划页看「已写入计划」的组数/时长 → 两端「立即同步」互查。
-- **可选下一步**：Garmin 570 数据导入（FIT/TCX/CSV；单条导出或 USB 拷贝，官方无个人 API）；今日/状态页加身体摘要；质量评估历史筛选；OCR；后台通知。
+- **验收**：身体页记身高/体重 → 睡眠页填午睡 → 记一次质量课看今日页评估卡 → 计划页看「已写入计划」的组数/时长 → **首页「今天休息」→ 计划页显示已休息且完成度 +1** → **计划页准备度/7 天睡眠随睡眠记录更新** → 两端「立即同步」互查。
+- **可选下一步**：Garmin 570 数据导入（TCX 优先，其次 FIT，CSV 批量历史；单条导出或 USB 拷贝，官方无个人 API）；今日/状态页加身体摘要；质量评估历史筛选；OCR；后台通知。
 - 当前代码工作区干净，`main` 与 `origin/main` 同步；87 个测试通过。
